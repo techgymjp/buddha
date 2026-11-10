@@ -4,9 +4,9 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { buildBuddha, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611101801';
-import { World, UNIT_M, makeLightPillars } from './world.js?v=202611101801';
-import { AudioEngine } from './audio.js?v=202611101801';
+import { buildBuddha, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611101804';
+import { World, UNIT_M, makeLightPillars } from './world.js?v=202611101804';
+import { AudioEngine } from './audio.js?v=202611101804';
 
 const $ = (id) => document.getElementById(id);
 const store = {
@@ -16,11 +16,11 @@ const store = {
 
 // ---------- 定数 ----------
 const STAGES = [
-  { name: '地上の寺院', goal: 1800, curse: 0.07, foeRate: 0.08, foes: ['crow'], grav: 2.3 },
-  { name: '山頂',       goal: 1500, curse: 0.11, foeRate: 0.13, foes: ['crow', 'crow', 'thunder'], grav: 3.1 },
-  { name: '雲海',       goal: 1800, curse: 0.15, foeRate: 0.16, foes: ['thunder', 'crow'], grav: 3.6 },
-  { name: '天空',       goal: 2100, curse: 0.19, foeRate: 0.18, foes: ['thunder'], grav: 4.1 },
-  { name: '極楽浄土',   goal: 2400, curse: 0.22, foeRate: 0, foes: [], grav: 4.6 },
+  { name: '地上の寺院', goal: 1800, curse: 0.07, foeRate: 0.08, foes: ['crow'], grav: 4, scroll: 12 },
+  { name: '山頂',       goal: 1500, curse: 0.11, foeRate: 0.13, foes: ['crow', 'crow', 'thunder'], grav: 4.6, scroll: 14 },
+  { name: '雲海',       goal: 1800, curse: 0.15, foeRate: 0.16, foes: ['thunder', 'crow'], grav: 5.2, scroll: 16 },
+  { name: '天空',       goal: 2100, curse: 0.19, foeRate: 0.18, foes: ['thunder'], grav: 5.8, scroll: 18 },
+  { name: '極楽浄土',   goal: 2400, curse: 0.22, foeRate: 0, foes: [], grav: 6.4, scroll: 20 },
 ];
 let acc = 0; STAGES.forEach((s) => { s.start = acc; acc += s.goal; });
 const FORMS = [
@@ -31,7 +31,7 @@ const FORMS = [
   { lv: 5, name: '黄金の大仏', need: 85000, minStage: 3, scale: 1.35 },
 ];
 const COINS = {
-  zeni: { money: 10, r: 0.46, boost: 5.5, w: 70 },
+  zeni: { money: 10, r: 0.46, boost: 7, w: 70 },
   koban: { money: 300, r: 0.6, boost: 6, w: 9 },
   goriyaku: { money: 500, r: 0.45, boost: 16, w: 2.2 },
   noroi: { money: 0, r: 0.38, boost: -5, w: 0 },
@@ -303,7 +303,7 @@ let G = null;
 function newGameState() {
   return {
     stage: 0, money: 0, score: 0, form: 0, maxCombo: 0, henshins: 0,
-    bx: 0, by: 1.2, bvx: 0, v: 14, camY: 4.8, mouth: 0,
+    bx: 0, by: 1.2, bvx: 0, v: 14, camY: 2.4, mouth: 0, danger: 0, beatT: 0,
     coins: [], foes: [], path: null, foeAcc: 0, accSm: 0, thrust: 0, lift: 0,
     combo: 0, comboT: 0, gori: 0, curse: 0, inv: 0, dai: 0,
     fever: false, feverCount: 0, stageMoney: 0, fovKick: 0, shake: 0, time: 0,
@@ -417,10 +417,7 @@ function spawnFoe(cy, halfH) {
     const obj = makeCrow(); obj.scale.setScalar(1.3);
     const y = G.by + 7 + Math.random() * 5;
     obj.position.set(-dir * 12, y, 0.3); obj.rotation.y = dir > 0 ? 0 : Math.PI; scene.add(obj);
-    // 飛んでくる1秒前に、来る側の画面端に「！」を出す
-    const warn = document.createElement('div'); warn.className = 'crow-warn'; warn.textContent = '！'; warn.style[dir > 0 ? 'left' : 'right'] = '6px';
-    $('floaters').appendChild(warn);
-    G.foes.push({ kind, obj, x: -dir * 12, y, vx: dir * (3 + Math.random() * 1.5 + G.stage * 0.4), t: 0, r: 0.45, warn, warnT: 1.0 });
+    G.foes.push({ kind, obj, x: -dir * 12, y, vx: dir * (3 + Math.random() * 1.5 + G.stage * 0.4), t: 0, r: 0.45 });
   } else {
     const obj = new THREE.Group();
     for (let i = 0; i < 7; i++) {
@@ -454,9 +451,7 @@ function suckR() {
 const suckPow = () => 42 + G.form * 6 + (G.gori > 0 ? 30 : 0) + (G.dai > 0 ? 60 : 0);
 // 最高速度（仏像が大きいほど・御利益中・大仏で上がる）
 function maxSpeed() {
-  let vm = 18 + G.stage * 1.5 + G.form * 2 + (G.gori > 0 ? 18 : 0) + (G.dai > 0 ? 22 : 0);
-  if (G.fever && G.dai <= 0) vm = Math.min(vm, 20); // 賽銭の嵐では吸い込む時間をつくる
-  return vm;
+  return STAGES[G.stage].scroll + 8 + G.form * 1.5 + (G.gori > 0 ? 16 : 0) + (G.dai > 0 ? 25 : 0);
 }
 const altM = () => Math.max(0, G.by * UNIT_M);
 window.__altM = () => altM();
@@ -521,9 +516,14 @@ function update(dt) {
   G.lift += (liftTarget - G.lift) * Math.min(1, dt * (liftTarget > G.lift ? 9 : 2.2));
   G.thrust = Math.max(G.gori > 0 || G.dai > 0 ? 1.2 : 0, G.thrust - dt * 2.2);
   G.surge = (G.surge || 0) * Math.pow(0.002, dt);
-  const camTarget = G.by + 3.6 - G.lift; // 仏像は画面の下寄り（上に続く硬貨の道を見せる）
-  if (camTarget > G.camY) G.camY += (camTarget - G.camY) * Math.min(1, dt * 5); // 落ちるときはカメラは追わない
-  if (G.by < G.camY - viewHalfH - 3.5) { gameOver(); return; }
+  // 画面は一定の速さで上へ進み続ける（最初の数秒はゆっくり始まる）
+  const ramp = Math.min(1, G.time / 4);
+  G.camY += (st.scroll * ramp / UNIT_M) * dt;
+  // 速ければ画面ごと押し上げる（仏像は画面の中ほどより上には行かない）
+  if (G.by > G.camY - 1.2) G.camY = G.by + 1.2;
+  // 画面の下まで沈んだらアウト
+  G.danger = THREE.MathUtils.clamp(1 - (G.by - (G.camY - viewHalfH)) / 5, 0, 1);
+  if (G.by < G.camY - viewHalfH + 0.6) { gameOver(); return; }
 
   // 硬貨の道を先まで敷く
   extendPath(G.camY + viewHalfH + 12);
@@ -799,7 +799,7 @@ function frameVisuals(dt, t) {
     model.userData.mouth.scale.y = 0.04;
     world.update(0, camera.position, t);
     for (const L of lineData) L.k = 0; lineMat.opacity = 0;
-    swirl.visible = false;
+    swirl.visible = false; $('danger').style.opacity = 0;
     updatePillars(t, by + 10, 0);
     updateMotesFor(by);
     aura.material.opacity = 0.18;
@@ -903,6 +903,10 @@ function frameVisuals(dt, t) {
   // すれ違う雲（近くを高速で抜けていく）
   for (const c of world.passClouds) c.material.opacity = 0.25 + speed01 * 0.35;
 
+  // 沈みかけ：画面の縁が赤く脈打ち、心音が鳴る
+  const dg = G.danger || 0;
+  $('danger').style.opacity = dg > 0 ? (dg * (0.55 + 0.45 * Math.sin(t * (0.008 + dg * 0.01)))).toFixed(3) : 0;
+  if (state === 'play' && dg > 0.25) { G.beatT -= dt; if (G.beatT <= 0) { audio.beat(dg); G.beatT = 0.85 - dg * 0.45; } }
   // 音楽の盛り上がりと風
   audio.intensity = Math.min(1, speed01 * 0.9 + (G.fever ? 0.25 : 0) + (G.dai > 0 ? 0.4 : 0));
   audio.setWind(state === 'play' ? speed01 : 0);

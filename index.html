@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Old+Mincho:wght@700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=202611101801">
+<link rel="stylesheet" href="style.css?v=202611101804">
 <script type="importmap">
 { "imports": { "three": "./vendor/three.module.min.js", "three/addons/": "./vendor/addons/" } }
 </script>
@@ -45,6 +45,7 @@
 <div id="floaters"></div>
 <div id="banner"></div>
 <div id="flash"></div>
+<div id="danger"></div>
 
 <!-- タイトル -->
 <section id="title" class="screen">
@@ -69,7 +70,7 @@
       <li>操作は<b>左右の移動だけ</b>（スワイプ／PCは ← →）。硬貨は<b>自動で吸い込む</b></li>
       <li>上に連なる<b>硬貨の道をたどって</b>吸い込むほど加速して昇る</li>
       <li>お金を吸うたびに<b>加速</b>。連続で吸うほど加速が強くなる</li>
-      <li>吸わないと重力で減速し、<b>勢い</b>が尽きると落下…画面の下まで落ちたら終わり</li>
+      <li>画面はどんどん上へ進む。硬貨を取らないと<b>浮力を失って沈み</b>、<b>画面の下まで沈んだらアウト</b></li>
       <li><b>カラスに当たったら即アウト！</b>（御利益中・大仏変身中は追い払える）</li>
     </ul>
     <div class="legend">
@@ -108,6 +109,6 @@
 <div id="nogl" class="screen hidden"><div class="card"><h2 class="gold">WebGLが使えません</h2><p>このゲームは3D表示（WebGL）に対応したブラウザで遊べます。</p></div></div>
 
 </div>
-<script type="module" src="js/main.js?v=202611101801"></script>
+<script type="module" src="js/main.js?v=202611101804"></script>
 </body>
 </html>
