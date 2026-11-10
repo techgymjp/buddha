@@ -4,9 +4,9 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { buildBuddha, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js';
-import { World, UNIT_M, makeLightPillars } from './world.js';
-import { AudioEngine } from './audio.js';
+import { buildBuddha, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611101729';
+import { World, UNIT_M, makeLightPillars } from './world.js?v=202611101729';
+import { AudioEngine } from './audio.js?v=202611101729';
 
 const $ = (id) => document.getElementById(id);
 const store = {
@@ -16,10 +16,10 @@ const store = {
 
 // ---------- 定数 ----------
 const STAGES = [
-  { name: '地上の寺院', goal: 1800, curse: 0.07, foeRate: 0.2, foes: ['crow'], grav: 2.3 },
-  { name: '山頂',       goal: 1500, curse: 0.11, foeRate: 0.3, foes: ['crow', 'crow', 'thunder'], grav: 3.1 },
-  { name: '雲海',       goal: 1800, curse: 0.15, foeRate: 0.38, foes: ['thunder', 'crow'], grav: 3.6 },
-  { name: '天空',       goal: 2100, curse: 0.19, foeRate: 0.42, foes: ['thunder'], grav: 4.1 },
+  { name: '地上の寺院', goal: 1800, curse: 0.07, foeRate: 0.08, foes: ['crow'], grav: 2.3 },
+  { name: '山頂',       goal: 1500, curse: 0.11, foeRate: 0.13, foes: ['crow', 'crow', 'thunder'], grav: 3.1 },
+  { name: '雲海',       goal: 1800, curse: 0.15, foeRate: 0.16, foes: ['thunder', 'crow'], grav: 3.6 },
+  { name: '天空',       goal: 2100, curse: 0.19, foeRate: 0.18, foes: ['thunder'], grav: 4.1 },
   { name: '極楽浄土',   goal: 2400, curse: 0.22, foeRate: 0, foes: [], grav: 4.6 },
 ];
 let acc = 0; STAGES.forEach((s) => { s.start = acc; acc += s.goal; });
@@ -318,7 +318,7 @@ function toTitle() {
 function clearWorldObjects() {
   if (!G) return;
   for (const c of G.coins) scene.remove(c.obj);
-  for (const f of G.foes) scene.remove(f.obj);
+  for (const f of G.foes) { scene.remove(f.obj); if (f.warn) f.warn.remove(); }
 }
 
 // ---------- 生成：仏像の上に連なる硬貨の道 ----------
@@ -329,25 +329,25 @@ function addCoin(type, x, y, z = 0) {
   obj.position.set(x, y, z); obj.scale.setScalar(1.15); scene.add(obj);
   G.coins.push({ type, obj, x, y, z, vx: 0, vy: 0, spin: Math.random() * 6, ph: Math.random() * 6, pulled: false });
 }
+// 硬貨の道は左右の「車線」を通る。真ん中を通るのは車線を移るときだけなので、左右に動かないと取れない
+const LANE = 3.4;
 function newSegment(P) {
-  if (G.fever) { P.mode = 'storm'; P.left = 999; return; }
+  if (G.fever) { P.mode = 'storm'; P.left = 999; P.side = P.x > 0 ? 1 : -1; return; }
   const r = Math.random();
-  // 区間が変わるたびに道が左右に大きく移る
-  if (Math.random() < 0.5) P.x = (P.x > 0 ? -1 : 1) * (2.5 + Math.random() * 2.8);
-  P.cx = THREE.MathUtils.clamp(P.x, -2, 2);
+  P.side = Math.random() < 0.6 ? -(P.side || 1) : (P.side || 1); // 多くの場合、反対側の車線へ
+  P.cx = P.side * LANE;
   P.ph = 0;
-  if (r < 0.24) { P.mode = 'wave'; P.left = 10 + (Math.random() * 8 | 0); P.amp = 3 + Math.random() * 2; P.freq = 0.3 + Math.random() * 0.15; }
-  else if (r < 0.36) { P.mode = 'line'; P.left = 6 + (Math.random() * 6 | 0); P.slope = (Math.random() < 0.5 ? -1 : 1) * (0.6 + Math.random() * 0.6); }
-  else if (r < 0.48) { P.mode = 'helix'; P.left = 8 + (Math.random() * 6 | 0); }
-  else if (r < 0.64) { P.mode = 'zigzag'; P.left = 10 + (Math.random() * 8 | 0); P.tx = P.x > 0 ? -4.6 : 4.6; }
-  else if (r < 0.78) { P.mode = 'scatter'; P.left = 8 + (Math.random() * 6 | 0); }
-  else if (r < 0.9) { P.mode = 'branch'; P.left = 8 + (Math.random() * 5 | 0); P.good = Math.random() < 0.5 ? -1 : 1; P.cx = 0; P.x = 0; }
+  if (r < 0.28) { P.mode = 'wave'; P.left = 9 + (Math.random() * 6 | 0); P.amp = 0.8 + Math.random() * 1.2; P.freq = 0.35 + Math.random() * 0.2; }
+  else if (r < 0.48) { P.mode = 'cross'; P.left = 6 + (Math.random() * 4 | 0); } // 反対側の車線へ斜めに渡る
+  else if (r < 0.62) { P.mode = 'helix'; P.left = 8 + (Math.random() * 6 | 0); }
+  else if (r < 0.76) { P.mode = 'zigzag'; P.left = 10 + (Math.random() * 6 | 0); P.tx = -P.side * LANE; }
+  else if (r < 0.9) { P.mode = 'branch'; P.left = 8 + (Math.random() * 5 | 0); P.good = Math.random() < 0.5 ? -1 : 1; P.cx = 0; }
   else if (G.time > 4) { P.mode = 'gap'; P.left = 1 + (Math.random() * 2 | 0) + (G.stage >> 1); }
-  else { P.mode = 'wave'; P.left = 8; P.amp = 3.5; P.freq = 0.35; }
+  else { P.mode = 'wave'; P.left = 8; P.amp = 1; P.freq = 0.4; }
 }
 function extendPath(limitY) {
   const st = STAGES[G.stage];
-  if (!G.path) G.path = { x: G.bx, y: G.by + 2.4, mode: 'wave', left: 16, amp: 1.6, freq: 0.3, ph: 0, cx: G.bx, n: 0 };
+  if (!G.path) G.path = { x: LANE, y: G.by + 2.4, mode: 'wave', left: 8, amp: 0.8, freq: 0.4, ph: 0, cx: LANE, side: 1, n: 0 };
   const P = G.path;
   while (P.y < limitY) {
     if (P.left-- <= 0) newSegment(P);
@@ -355,20 +355,20 @@ function extendPath(limitY) {
     let z = 0;
     switch (P.mode) {
       case 'wave': P.x = P.cx + Math.sin(P.ph * P.freq * 2) * P.amp; break;
+      case 'cross': P.x += (P.cx - P.x) * 0.35; break;
       case 'line': P.x += P.slope * STEP; if (Math.abs(P.x) > XB - 0.6) P.slope *= -1; break;
-      case 'helix': P.x = P.cx + Math.sin(P.ph * 0.7) * 3.2; z = Math.cos(P.ph * 0.7) * 1.2; break;
-      case 'zigzag': P.x += Math.sign(P.tx - P.x) * Math.min(1.5, Math.abs(P.tx - P.x)); if (Math.abs(P.tx - P.x) < 0.1) P.tx = -P.tx; break;
-      case 'scatter': P.x += (P.x > 0 ? -1 : 1) * (1.5 + Math.random() * 2.5); break; // 左右に振られた硬貨を取りに行く
-      case 'storm': P.x = Math.sin(P.ph * 0.35) * 3.2; break;
+      case 'helix': P.x = P.cx + Math.sin(P.ph * 0.7) * 1.4; z = Math.cos(P.ph * 0.7) * 1.2; break;
+      case 'zigzag': P.x = P.x > 0 ? -LANE - Math.random() : LANE + Math.random(); break; // 左右の車線に交互
+      case 'storm': if (P.ph % 10 === 0) P.side = -P.side; P.x = P.side * 3.6; break;
     }
     P.x = THREE.MathUtils.clamp(P.x, -XB + 0.4, XB - 0.4);
     if (P.mode === 'gap') continue;
     if (P.mode === 'storm') { // 賽銭の嵐：太い硬貨の帯
-      for (const off of [-2, 0, 2]) addCoin(Math.random() < 0.14 ? 'koban' : 'zeni', P.x + off, P.y + (Math.random() - 0.5) * 0.3);
+      for (const off of [-1.4, 0, 1.4]) addCoin(Math.random() < 0.14 ? 'koban' : 'zeni', P.x + off, P.y + (Math.random() - 0.5) * 0.3);
       continue;
     }
     if (P.mode === 'branch') { // 分かれ道：片方は小判、もう片方は呪いの銭まじり
-      const spread = Math.min(3.8, (P.left < 3 ? P.left : 3) * 1.3);
+      const spread = Math.min(LANE, (P.left < 3 ? P.left : 3) * 1.3);
       for (const side of [-1, 1]) {
         const good = side === P.good;
         const x = P.x + side * spread;
@@ -392,9 +392,12 @@ function spawnFoe(cy, halfH) {
   if (kind === 'crow') {
     const dir = Math.random() < 0.5 ? 1 : -1;
     const obj = makeCrow(); obj.scale.setScalar(1.3);
-    const y = G.by + 4 + Math.random() * 6;
+    const y = G.by + 7 + Math.random() * 5;
     obj.position.set(-dir * 12, y, 0.3); obj.rotation.y = dir > 0 ? 0 : Math.PI; scene.add(obj);
-    G.foes.push({ kind, obj, x: -dir * 12, y, vx: dir * (3.5 + Math.random() * 2 + G.stage * 0.6), t: 0, r: 0.7 });
+    // 飛んでくる1秒前に、来る側の画面端に「！」を出す
+    const warn = document.createElement('div'); warn.className = 'crow-warn'; warn.textContent = '！'; warn.style[dir > 0 ? 'left' : 'right'] = '6px';
+    $('floaters').appendChild(warn);
+    G.foes.push({ kind, obj, x: -dir * 12, y, vx: dir * (3 + Math.random() * 1.5 + G.stage * 0.4), t: 0, r: 0.45, warn, warnT: 1.0 });
   } else {
     const obj = new THREE.Group();
     for (let i = 0; i < 7; i++) {
@@ -502,7 +505,7 @@ function update(dt) {
   mouthW.set(G.bx, G.by + 2.7 * S, -0.2);           // 吸い込み口は頭上
   const tx = G.bx, ty = G.by + 2.7 * S;
   const cx = G.bx, cy = ty + R * 0.75;          // 吸引範囲は仏像の上に伸びる
-  const rx = Math.min(R * 0.5, 2.6) + (G.dai > 0 ? 6 : 0), ry = R * 1.4; // 横幅は細く：左右に動いて狙う
+  const rx = Math.min(R * 0.3, 1.5) + (G.dai > 0 ? 6 : 0), ry = R * 1.4; // 真上の細い柱だけを吸う // 横幅は細く：左右に動いて狙う
   G.suck = { cx, cy, rx, ry, tx, ty };
   const bvy = G.v / UNIT_M;
   const damp = Math.pow(0.02, dt);
@@ -544,17 +547,23 @@ function update(dt) {
     const f = G.foes[i];
     f.t += dt;
     if (f.kind === 'crow') {
+      if (f.warnT > 0) { // 警告中はまだ飛んでこない
+        f.warnT -= dt;
+        proj.set(0, f.y, 0.3).project(camera);
+        f.warn.style.top = ((1 - proj.y) / 2 * window.innerHeight) + 'px';
+        if (f.warnT <= 0) { f.warn.remove(); f.warn = null; }
+        continue;
+      }
       f.x += f.vx * dt; f.y += Math.sin(f.t * 4) * 0.6 * dt;
       f.obj.position.set(f.x, f.y, 0.3);
       const flap = Math.sin(f.t * 16) * 0.9;
       f.obj.userData.wings[0].rotation.x = -flap; f.obj.userData.wings[1].rotation.x = flap;
-      if (Math.hypot(G.bx - f.x, G.by + 1.0 * S - f.y) < 0.9 * S + f.r) {
+      if (Math.hypot(G.bx - f.x, G.by + 1.0 * S - f.y) < 0.6 * S + f.r) {
         if (G.dai > 0 || G.gori > 0) { G.score += 200; emit(f.x, f.y, 0, 0xfff0c0, 24, 6); scene.remove(f.obj); G.foes.splice(i, 1); continue; }
-        if (G.inv <= 0) {
-          const stolen = Math.min(G.money, 30 + G.stage * 30);
-          G.money -= stolen;
-          hurt(6, 'カラスにお金を奪われた！');
-        }
+        // カラスに当たったら即アウト
+        audio.hit(); flash(0.5); G.shake = 1;
+        emit(f.x, f.y, 0, 0x222228, 30, 6, 1);
+        gameOver('カラスに当たった！'); return;
       }
       if (Math.abs(f.x) > 16) { scene.remove(f.obj); G.foes.splice(i, 1); continue; }
     } else {
@@ -670,16 +679,16 @@ function stageClear() {
   if (last) { resultKind = 'end'; setModel(5); G.dai = 1; }
   show('result', true); show('hud', false); show('panel', false);
 }
-function gameOver() {
+function gameOver(reason = '') {
   state = 'result'; resultKind = 'over';
   input.down = input.key = false;
   saveBest();
   audio.tone(220, 0.6, 'triangle', 0.1, 0, -120); audio.tone(165, 1.0, 'triangle', 0.1, 0.3, -80);
-  $('resTitle').textContent = '墜落…';
+  $('resTitle').textContent = reason ? 'カラスに激突…' : '墜落…';
   $('resAlt').textContent = Math.floor(G.maxAlt || altM()).toLocaleString() + 'm';
   $('resMoney').textContent = G.money.toLocaleString();
   $('resRibbon').textContent = `称号：${rank(G.score)}`;
-  $('resLines').innerHTML = [`第${G.stage + 1}天「${STAGES[G.stage].name}」で力尽きた`, `スコア <b>${G.score.toLocaleString()}</b>　最大 <b>${G.maxCombo}</b> 連続`, `ベストスコア <b>${best.score.toLocaleString()}</b>`].join('<br>');
+  $('resLines').innerHTML = [reason || `第${G.stage + 1}天「${STAGES[G.stage].name}」で力尽きた`, `スコア <b>${G.score.toLocaleString()}</b>　最大 <b>${G.maxCombo}</b> 連続`, `ベストスコア <b>${best.score.toLocaleString()}</b>`].join('<br>');
   $('resNext').textContent = 'もう一度遊ぶ';
   show('result', true); show('hud', false); show('panel', false);
 }
