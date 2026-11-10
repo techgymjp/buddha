@@ -4,10 +4,10 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { buildBuddha, buildSkin, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611102132';
-import { World, UNIT_M, makeLightPillars } from './world.js?v=202611102132';
-import { t, lang, setLang, applyStatic } from './i18n.js?v=202611102132';
-import { AudioEngine } from './audio.js?v=202611102132';
+import { buildBuddha, buildSkin, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611102136';
+import { World, UNIT_M, makeLightPillars } from './world.js?v=202611102136';
+import { t, lang, setLang, applyStatic } from './i18n.js?v=202611102136';
+import { AudioEngine } from './audio.js?v=202611102136';
 
 const $ = (id) => document.getElementById(id);
 const store = {
@@ -843,8 +843,8 @@ function update(dt) {
       if (f.waiting) { // まだ画面に入っていない高度のカラスは待機
         if (f.y > G.camY + viewHalfH + 7) continue; // 画面に入る少し前から飛び始める
         const dir = Math.random() < 0.5 ? 1 : -1;
-        f.waiting = false; f.home = -dir; f.x = -dir * (XB + 3); f.vx = dir * f.speed;
-        f.obj.visible = true; f.obj.rotation.y = dir > 0 ? 0 : Math.PI;
+        f.waiting = false; f.home = -dir; f.x = -dir * XB * Math.random(); f.vx = (Math.random() < 0.5 ? 1 : -1) * f.speed; // 画面の端〜中央のどこかに、すでに飛んでいる状態で現れる
+        f.obj.visible = true; f.obj.rotation.y = f.vx > 0 ? 0 : Math.PI;
       }
       f.x += f.vx * dt; f.y += Math.sin(f.t * 3) * f.bob * dt; // 一定の高度をまっすぐ横切る
       if (f.patrol) { if (Math.abs(f.x - f.cx) > f.range) { f.x = f.cx + Math.sign(f.x - f.cx) * f.range; f.vx = -f.vx; f.obj.rotation.y = f.vx > 0 ? 0 : Math.PI; } }
