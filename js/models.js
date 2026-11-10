@@ -116,7 +116,26 @@ const woodTex = canvasTex(512, 512, (g, w, h) => {
 });
 woodTex.wrapS = woodTex.wrapT = THREE.RepeatWrapping;
 
+// 鎌倉の大仏：緑青の浮いた青銅（雨だれの筋とまだら）
+function drawPatina(g, w, h, bump) {
+  g.fillStyle = bump ? '#808080' : '#a2b6ab'; g.fillRect(0, 0, w, h);
+  speckle(g, w, h, 500, bump ? ['rgba(255,255,255,.08)', 'rgba(0,0,0,.08)'] : ['rgba(70,72,62,.22)', 'rgba(170,195,182,.3)', 'rgba(110,130,115,.25)', 'rgba(60,64,58,.18)'], 6, 30);
+  for (let i = 0; i < 140; i++) { // 雨だれの筋
+    const x = Math.random() * w, y0 = Math.random() * h, len = 40 + Math.random() * 220;
+    g.strokeStyle = bump ? 'rgba(0,0,0,.06)' : (Math.random() < 0.5 ? 'rgba(55,60,52,.22)' : 'rgba(185,210,198,.22)');
+    g.lineWidth = 1 + Math.random() * 4;
+    g.beginPath(); g.moveTo(x, y0); g.lineTo(x + (Math.random() - 0.5) * 6, y0 + len); g.stroke();
+  }
+}
+const patinaTex = canvasTex(512, 512, (g, w, h) => drawPatina(g, w, h, false));
+const patinaBump = canvasTex(512, 512, (g, w, h) => drawPatina(g, w, h, true), false);
+for (const t of [patinaTex, patinaBump]) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(2, 2); }
+const stoneTex = canvasTex(256, 256, (g, w, h) => { g.fillStyle = '#8d8a82'; g.fillRect(0, 0, w, h); speckle(g, w, h, 400, ['rgba(60,58,52,.3)', 'rgba(180,176,166,.3)'], 1, 6); });
+stoneTex.wrapS = stoneTex.wrapT = THREE.RepeatWrapping;
+
 export const MAT = {
+  patina: new THREE.MeshStandardMaterial({ map: patinaTex, bumpMap: patinaBump, bumpScale: 0.25, metalness: 0.25, roughness: 0.55, envMapIntensity: 1.0, emissive: 0x18221e, emissiveIntensity: 0.6 }),
+  stone: new THREE.MeshStandardMaterial({ map: stoneTex, color: 0xd8d4cc, roughness: 0.95 }),
   wood: new THREE.MeshStandardMaterial({ color: 0xffe2b8, map: woodTex, roughness: 0.55, metalness: 0, bumpMap: woodTex, bumpScale: 0.6, envMapIntensity: 0.5 }),
   woodDark: new THREE.MeshStandardMaterial({ color: 0xb98a55, map: woodTex, roughness: 0.7 }),
   gold: new THREE.MeshPhysicalMaterial({ color: 0xf5b847, metalness: 1, roughness: 0.24, clearcoat: 0.6, clearcoatRoughness: 0.15, emissive: 0x2a1400, emissiveIntensity: 0.5 }),
@@ -190,18 +209,18 @@ function boatHaloGeometry(h, wdt, flames) {
 
 /**
  * 仏像を組み立てる
- * lv: 1木造仏 2金色 3光背巨大化 4千手観音 5黄金の大仏
+ * lv: 1木造仏 2黒漆 3光背巨大化 4鎌倉の大仏 5黄金の大仏
  */
 export function buildBuddha(lv) {
   const root = new THREE.Group();
   const body = new THREE.Group(); root.add(body);
-  const mat = lv === 1 ? MAT.wood : lv === 2 ? MAT.lacquer : lv === 4 ? MAT.goldWarm : lv === 5 ? MAT.goldGreat : MAT.gold;
+  const mat = lv === 1 ? MAT.wood : lv === 2 ? MAT.lacquer : lv === 4 ? MAT.patina : lv === 5 ? MAT.goldGreat : MAT.gold;
   const haloMat = lv === 2 ? MAT.gold : mat; // 黒漆の仏像は金の光背
   const hairMat = mat;
 
   // --- 蓮台 ---
   const ped = new THREE.Group(); body.add(ped);
-  const petalMat = lv === 1 ? MAT.wood : lv === 5 ? MAT.goldGreat : lv === 2 ? MAT.gold : MAT.lotus;
+  const petalMat = lv === 1 ? MAT.wood : lv === 5 ? MAT.goldGreat : lv === 2 ? MAT.gold : lv === 4 ? MAT.stone : MAT.lotus;
   // [枚数, 半径, 高さ, 外への傾き]
   const tiers = [[18, 0.9, -0.05, 0.55], [18, 0.84, -0.22, 0.95], [14, 0.72, -0.38, 1.25]];
   tiers.forEach(([n, r, y, lean], ti) => {
@@ -212,7 +231,7 @@ export function buildBuddha(lv) {
       p.rotation.set(lean, Math.PI / 2 - a, 0);
     }
   });
-  const baseMat = lv === 1 ? MAT.woodDark : MAT.goldWarm;
+  const baseMat = lv === 1 ? MAT.woodDark : lv === 4 ? MAT.stone : MAT.goldWarm;
   const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.72, 0.3, 32), baseMat); drum.position.y = -0.55; ped.add(drum);
   const drum2 = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.95, 0.16, 8), baseMat); drum2.position.y = -0.76; ped.add(drum2);
   const ring = new THREE.Mesh(new THREE.TorusGeometry(0.66, 0.035, 8, 40), baseMat); ring.rotation.x = Math.PI / 2; ring.position.y = -0.42; ped.add(ring);
@@ -237,15 +256,15 @@ export function buildBuddha(lv) {
   blob(mat, 0.52, 1.36, -0.02, 0.27, 0.25, 0.27, body);
   // 衣の縁（袈裟）
   const drape = new THREE.CatmullRomCurve3([V(-0.5, 1.5, 0.12), V(-0.15, 1.2, 0.42), V(0.2, 0.8, 0.44), V(0.5, 0.55, 0.35)]);
-  body.add(new THREE.Mesh(new THREE.TubeGeometry(drape, 30, 0.045, 8), mat));
-  for (let i = 0; i < 4; i++) {
+  if (lv !== 4) body.add(new THREE.Mesh(new THREE.TubeGeometry(drape, 30, 0.045, 8), mat));
+  for (let i = 0; i < (lv === 4 ? 0 : 4); i++) {
     const c = new THREE.CatmullRomCurve3([V(-0.45, 1.05 - i * 0.13, 0.36), V(0, 0.95 - i * 0.13, 0.46), V(0.45, 1.0 - i * 0.13, 0.36)]);
     body.add(new THREE.Mesh(new THREE.TubeGeometry(c, 16, 0.016, 6), mat));
   }
 
   // --- 腕と手 ---
-  if (lv === 4) {
-    // 合掌
+  if (false) {
+    // 合掌（未使用）
     capsule(mat, V(-0.6, 1.3, 0), V(-0.55, 0.85, 0.25), 0.12, body);
     capsule(mat, V(0.6, 1.3, 0), V(0.55, 0.85, 0.25), 0.12, body);
     capsule(mat, V(-0.55, 0.85, 0.25), V(-0.06, 1.05, 0.55), 0.1, body);
@@ -288,8 +307,8 @@ export function buildBuddha(lv) {
   const mouth = blob(MAT.dark, 0, -0.265, 0.045, 0.06, 0.006, 0.02, face);
   const urna = blob(MAT.urna, 0, 0.17, 0.05, 0.025, 0.025, 0.025, face);
 
-  // 螺髪・肉髻 / 宝冠
-  if (lv === 4) {
+  // 螺髪・肉髻
+  if (false) {
     curls(head, hairMat, 0, 0.04, 0, 0.42, 300, 0.1, 0.04);
     const crown = new THREE.Group(); crown.position.set(0, 0.38, 0); head.add(crown);
     const band = new THREE.Mesh(new THREE.TorusGeometry(0.4, 0.035, 8, 40), MAT.gold); band.rotation.x = Math.PI / 2; crown.add(band);
@@ -309,7 +328,9 @@ export function buildBuddha(lv) {
   // --- 光背 ---
   const halo = new THREE.Group(); halo.position.set(0, 2.12, -0.5); body.add(halo);
   let glowSize = 0;
-  if (lv === 1) {
+  if (lv === 4) {
+    // 鎌倉の大仏は光背なし
+  } else if (lv === 1) {
     const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.78, 0.78, 0.05, 48), MAT.woodDark); disc.rotation.x = Math.PI / 2; halo.add(disc);
     const r1 = new THREE.Mesh(new THREE.TorusGeometry(0.78, 0.045, 8, 48), MAT.wood); halo.add(r1);
     const r2 = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.025, 8, 48), MAT.wood); r2.position.z = 0.03; halo.add(r2);
@@ -356,36 +377,21 @@ export function buildBuddha(lv) {
     glowSize = lv >= 5 ? 7 : lv >= 3 ? 5 : 3.2;
   }
 
-  // 千手
+  // 鎌倉の大仏：両肩から胸元へU字に垂れる衣の襞、広い肩と大きな袖
   if (lv === 4) {
-    const arms = new THREE.Group(); arms.position.set(0, 1.2, -0.42); body.add(arms);
-    const N = 21;
-    for (let layer = 0; layer < 2; layer++) {
-      for (let i = 0; i < N; i++) {
-        for (const side of [-1, 1]) {
-          const a = -0.55 + (i / (N - 1)) * 1.75 + layer * 0.08; // 横〜斜め上に扇状
-          const dir = V(side * Math.cos(a), Math.sin(a), 0);
-          const L = 1.05 + layer * 0.35 + (i % 3) * 0.08;
-          const sh = V(side * 0.42, 0, -layer * 0.14);
-          const elbow = sh.clone().add(dir.clone().multiplyScalar(L * 0.5)).add(V(0, 0, 0.05));
-          const hand = sh.clone().add(dir.clone().multiplyScalar(L));
-          capsule(mat, sh, elbow, 0.055, arms);
-          capsule(mat, elbow, hand, 0.045, arms);
-          const h = blob(mat, hand.x, hand.y, hand.z, 0.06, 0.1, 0.035, arms, 0, 0, Math.atan2(dir.y, dir.x) - Math.PI / 2);
-          if ((i + layer) % 5 === 0) { // 持物
-            const w = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.018, 6, 16), MAT.gold); w.position.copy(h.position).add(dir.clone().multiplyScalar(0.12)); arms.add(w);
-          }
-        }
+    for (let i = 0; i < 6; i++) {
+      const dy = i * 0.11, w = 0.5 - i * 0.03;
+      const c = new THREE.CatmullRomCurve3([V(-w - 0.05, 1.5 - dy * 0.3, 0.18), V(-w * 0.55, 1.2 - dy, 0.4), V(0, 1.02 - dy * 1.15, 0.47), V(w * 0.55, 1.2 - dy, 0.4), V(w + 0.05, 1.5 - dy * 0.3, 0.18)]);
+      body.add(new THREE.Mesh(new THREE.TubeGeometry(c, 30, 0.045, 8), mat));
+    }
+    for (const sx of [-1, 1]) {
+      blob(mat, sx * 0.62, 1.15, 0.05, 0.3, 0.42, 0.32, body);            // 大きな袖
+      for (let i = 0; i < 4; i++) { // 袖の縦の襞
+        const c = new THREE.CatmullRomCurve3([V(sx * (0.5 + i * 0.07), 1.45, 0.2), V(sx * (0.62 + i * 0.06), 1.0, 0.3), V(sx * (0.7 + i * 0.04), 0.6, 0.3)]);
+        body.add(new THREE.Mesh(new THREE.TubeGeometry(c, 16, 0.022, 6), mat));
       }
     }
-    // 背後の小さな手の円盤
-    const fan = new THREE.Mesh(new THREE.CircleGeometry(2.3, 64), new THREE.MeshPhysicalMaterial({ color: 0x8a5418, metalness: 1, roughness: 0.45 }));
-    fan.position.set(0, 1.4, -0.95); body.add(fan);
-    const handGeo = new THREE.CylinderGeometry(0.02, 0.03, 0.5, 4);
-    for (let i = 0; i < 160; i++) {
-      const a = i / 160 * Math.PI * 2;
-      const m = new THREE.Mesh(handGeo, mat); m.position.set(Math.cos(a) * 2.35, 1.4 + Math.sin(a) * 2.35, -0.9); m.rotation.z = a - Math.PI / 2; body.add(m);
-    }
+    body.scale.set(1.12, 1, 1.08); // どっしりした体つき
   }
 
   // 後光の輝き（加算スプライト）

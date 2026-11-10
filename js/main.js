@@ -4,9 +4,9 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { buildBuddha, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611101852';
-import { World, UNIT_M, makeLightPillars } from './world.js?v=202611101852';
-import { AudioEngine } from './audio.js?v=202611101852';
+import { buildBuddha, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611101858';
+import { World, UNIT_M, makeLightPillars } from './world.js?v=202611101858';
+import { AudioEngine } from './audio.js?v=202611101858';
 
 const $ = (id) => document.getElementById(id);
 const store = {
@@ -27,7 +27,7 @@ const FORMS = [
   { lv: 1, name: '木造仏', need: 0, scale: 0.95 },
   { lv: 2, name: '黒漆の仏像', need: 12000, minStage: 0, scale: 1.0 },
   { lv: 3, name: '光背の仏像', need: 30000, minStage: 1, scale: 1.05 },
-  { lv: 4, name: '千手観音', need: 55000, minStage: 2, scale: 1.1 },
+  { lv: 4, name: '鎌倉の大仏', need: 55000, minStage: 2, scale: 1.2 },
   { lv: 5, name: '黄金の大仏', need: 85000, minStage: 3, scale: 1.35 },
 ];
 const COINS = {
