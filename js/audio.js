@@ -310,6 +310,15 @@ export class AudioEngine {
     [784, 988, 1175].forEach((f, i) => this.tone(f, 0.8, 'triangle', 0.06, i * 0.05));
     this.thump(1.2); this.boost(1);
   }
+  // 連続の節目の鈴（段が上がるほど高く華やかに）
+  chime(lv = 1) {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const base = 1318 * Math.pow(2, Math.min(lv, 6) / 12);
+    this.metal(base, t, 0.22, 1.0, -0.3);
+    this.metal(base * 1.5, t + 0.07, 0.18, 1.0, 0.3);
+    if (lv >= 3) this.metal(base * 2, t + 0.14, 0.14, 1.2, 0);
+  }
   // 加速の「ズン」
   thump(k = 1) {
     const ctx = this.ctx; if (!ctx) return;

@@ -1,6 +1,6 @@
 // 世界：空、光、雲、寺院、山頂の懸造り、雲海、天空、極楽浄土
 import * as THREE from 'three';
-import { canvasTex, glowTexture, dotTexture, buildBuddha, MAT } from './models.js?v=202611101731';
+import { canvasTex, glowTexture, dotTexture, buildBuddha, MAT } from './models.js?v=202611101733';
 
 export const UNIT_M = 6; // 1ユニット = 6m
 
@@ -359,7 +359,7 @@ export class World {
 
   // 清水の舞台風の懸造り
   buildKiyomizu() {
-    const g = new THREE.Group(); g.position.set(62, 0, -112); this.scene.add(g);
+    const g = new THREE.Group(); g.position.set(70, 0, -260); this.scene.add(g);
     const wood = new THREE.MeshStandardMaterial({ color: 0x5a4030, roughness: 0.9 });
     const top = 376;
     // 舞台の背後にそびえる山（舞台はこの斜面に張り出して建つ）
@@ -382,7 +382,7 @@ export class World {
     const peak = paint(new THREE.ConeGeometry(R, H, 64, 16, true), 0.25);
     peak.position.set(0, apexY - H / 2, apexZ); g.add(peak);
     const trunkH = apexY - H + 20;
-    const trunk = paint(new THREE.CylinderGeometry(R, 85, trunkH, 64, 12, true), 0.55);
+    const trunk = paint(new THREE.CylinderGeometry(R * 0.9, 50, trunkH, 64, 12, true), 0.7);
     trunk.position.set(0, apexY - H - trunkH / 2 + 0.5, apexZ); g.add(trunk);
     // 懸造り：柱は斜面まで届く
     const pg = new THREE.CylinderGeometry(0.45, 0.5, 1, 8);

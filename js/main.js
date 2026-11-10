@@ -4,9 +4,9 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { buildBuddha, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611101731';
-import { World, UNIT_M, makeLightPillars } from './world.js?v=202611101731';
-import { AudioEngine } from './audio.js?v=202611101731';
+import { buildBuddha, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611101733';
+import { World, UNIT_M, makeLightPillars } from './world.js?v=202611101733';
+import { AudioEngine } from './audio.js?v=202611101733';
 
 const $ = (id) => document.getElementById(id);
 const store = {
@@ -482,7 +482,14 @@ function update(dt) {
   }
 
   G.gori = Math.max(0, G.gori - dt); G.curse = Math.max(0, G.curse - dt); G.inv = Math.max(0, G.inv - dt);
-  G.comboT -= dt; if (G.comboT <= 0) G.combo = 0;
+  G.comboT -= dt;
+  if (G.comboT <= 0 && G.combo > 0) {
+    if (G.combo >= 5) { // 途切れた：周りの光がはらはらと散る
+      const n = Math.min(40, G.combo);
+      for (let k = 0; k < n && parts.length < MAXP; k++) { const a = Math.random() * 6.28, r = 1.4 * bScale(); parts.push({ x: G.bx + Math.cos(a) * r, y: G.by + 1.2 * bScale() + Math.sin(a) * r * 0.5, z: Math.sin(a) * 0.4, vx: Math.cos(a) * 0.8, vy: -1.5 - Math.random() * 2 + G.v / UNIT_M, vz: 0, life: 0.9, max: 0.9, r: 0.75, g: 0.65, b: 0.45, grav: 3 }); }
+    }
+    G.combo = 0;
+  }
   G.fovKick *= Math.pow(0.15, dt); G.shake *= Math.pow(0.05, dt);
 
   // カメラ追従（落下中は追わない）
@@ -633,7 +640,12 @@ function absorb(c) {
     inhaleRing(8, 0xfff2b0); setTimeout(() => G && inhaleRing(5, 0xfff2b0), 150);
   } else {
     audio.coin(Math.min(25, G.combo));
-    if (G.combo % 15 === 0) G.fovKick += 2;
+    if (G.combo % 5 === 0) { // 5連続ごと：光の輪が吸い込まれ、鈴が鳴る
+      const lv = Math.min(6, G.combo / 5);
+      inhaleRing(2.5 + lv * 0.8, lv >= 4 ? 0xfff6d0 : 0xffe08a);
+      inhale(10 + lv * 6, 2 + lv * 0.4, 0xfff0b0);
+      audio.chime(lv); flash(0.06 + lv * 0.02); G.fovKick += 1 + lv * 0.5;
+    }
   }
   // 成長
   let nf = G.form;
@@ -792,8 +804,16 @@ function frameVisuals(dt, t) {
   ud.lipL.position.y = -0.29 - G.mouth * 0.04;
   if (ud.halo) ud.halo.rotation.z += dt * (0.2 + speed01 * 1.5) * (ud.lv >= 3 ? 0.2 : 0.4);
   if (ud.glow) ud.glow.material.opacity = 0.22 + speed01 * 0.2 + (G.gori > 0 ? 0.2 : 0);
-  aura.material.opacity = 0.12 + speed01 * 0.25 + (G.dai > 0 ? 0.2 : 0);
-  aura.scale.setScalar(4 + speed01 * 4);
+  const comboK = Math.min(1, G.combo / 30);
+  aura.material.opacity = 0.12 + speed01 * 0.2 + comboK * 0.35 + (G.dai > 0 ? 0.2 : 0);
+  aura.scale.setScalar(4 + speed01 * 3 + comboK * 4 + Math.sin(t * 0.012) * comboK * 0.6);
+  // 連続数に応じて仏像の周りを回る光の粒が増える
+  const orbitN = Math.min(30, G.combo);
+  for (let k = 0; k < orbitN; k += 6) {
+    if (parts.length >= MAXP) break;
+    const a = t * 0.004 + (k / Math.max(1, orbitN)) * Math.PI * 2 + Math.random() * 0.2, r = (1.3 + comboK * 0.6) * S;
+    parts.push({ x: bx + Math.cos(a) * r, y: by + 1.2 * S + Math.sin(a * 2) * 0.3 * S, z: Math.sin(a) * r * 0.6, vx: -Math.sin(a) * 1.5, vy: G.v / UNIT_M, vz: Math.cos(a) * 0.9, life: 0.35, max: 0.35, r: 1, g: 0.86 + comboK * 0.1, b: 0.5 + comboK * 0.4, grav: 0 });
+  }
   aura.material.color.set(G.curse > 0 ? 0x9a40ff : 0xffc860);
   // 点滅（無敵時間）
   model.visible = !(G.inv > 0 && Math.floor(t / 70) % 2);
