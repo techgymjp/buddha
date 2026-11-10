@@ -4,10 +4,10 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { buildBuddha, buildSkin, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611102118';
-import { World, UNIT_M, makeLightPillars } from './world.js?v=202611102118';
-import { t, lang, setLang, applyStatic } from './i18n.js?v=202611102118';
-import { AudioEngine } from './audio.js?v=202611102118';
+import { buildBuddha, buildSkin, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611102132';
+import { World, UNIT_M, makeLightPillars } from './world.js?v=202611102132';
+import { t, lang, setLang, applyStatic } from './i18n.js?v=202611102132';
+import { AudioEngine } from './audio.js?v=202611102132';
 
 const $ = (id) => document.getElementById(id);
 const store = {
@@ -138,9 +138,10 @@ if (!skinUnlocked(skin)) skin = 'buddha';
 // 寄進で得られる永続的な強化
 function perks() {
   return {
-    suck: 1 + (hasB('sanmon') ? 0.15 : 0) + (hasB('pagoda') ? 0.15 : 0),   // 吸引範囲
-    lift: hasB('shoro') ? 1.12 : 1,                                         // 硬貨の浮力
-    charms: (hasB('lanterns') ? 1 : 0) + (hasB('daibutsuden') ? 1 : 0),   // お守り（カラスに耐える回数）
+    suck: 1 + (hasB('sanmon') ? 0.08 : 0) + (hasB('pagoda') ? 0.08 : 0),   // 吸引範囲
+    lift: hasB('shoro') ? 1.06 : 1,                                         // 硬貨の浮力
+    charms: hasB('lanterns') ? 1 : 0,
+    offer: hasB('daibutsuden') ? 1.5 : 1,                                  // お寺に入る賽銭   // お守り（カラスに耐える回数）
     start: hasB('pagoda') ? 800 : hasB('hondo') ? 300 : 0,                 // スタートの高さ（m）
   };
 }
@@ -555,9 +556,9 @@ function placeCrows(limitY) {
     // 間隔は指数分布：広い空白が続くことも、2羽が近い高さに続くこともある
     const gap = CROW_GAP[G.stage] / hardness(); // 高いほどカラスが増える
     G.nextCrowY += THREE.MathUtils.clamp(-Math.log(1 - Math.random()) * gap, 2.5, gap * 3.5);
-    if (G.fever || !STAGES[G.stage].foes.includes('crow')) continue;
+    if (!STAGES[G.stage].foes.includes('crow')) continue;
     // その高度が画面に入ってきたら、画面の端から飛び始めて横切る
-    const golden = Math.random() < 0.05 + G.stage * 0.015; // まれに八咫烏（踏めば大仏に変身）
+    const golden = Math.random() < 0.03; // まれに八咫烏（踏めば大仏に変身）
     const obj = getCrow(golden); obj.visible = false;
     G.foes.push({ kind: 'crow', golden, obj, x: 0, y, vx: 0, vy: 0, waiting: true, speed: (1.8 + Math.random() * 1.4 + G.stage * 0.2) * Math.sqrt(hardness()), bob: 0.25 + Math.random() * 0.3, t: Math.random() * 6, r: 0.5 });
   }
@@ -685,7 +686,7 @@ function maxSpeed() {
 }
 const altM = () => Math.max(0, G.by * UNIT_M);
 // 難しさ：1,500mを超えると高度に応じて上がっていく（終わりのない区間でもいずれ限界が来る）
-const hardness = () => 1 + Math.max(0, altM() - 2000) / 11000;
+const hardness = () => 1 + Math.max(0, altM() - 2000) / 7000;
 window.__altM = () => altM();
 
 // ---------- 更新 ----------
@@ -741,7 +742,7 @@ function update(dt) {
   // 賽銭の嵐：区間の終わりで起こり、次の区間に入ると収まる
   const seg = segmentAt(altM());
   if (G.segId !== seg.id) {
-    if (G.segId != null && seg.id > G.segId) { G.fever = false; G.feverCount = 0; G.dai = 0; setModel(FORMS[G.form].lv); }
+    if (G.segId != null && seg.id > G.segId) { if (G.dai > 0) { G.chain = 0; G.lastStomp = -9; G.henCool = G.time + 20; } G.fever = false; G.feverCount = 0; G.dai = 0; setModel(FORMS[G.form].lv); }
     G.segId = Math.max(G.segId ?? -1, seg.id);
   }
   if (!G.fever && altM() - seg.start >= seg.len * FEVER_AT && seg.id === G.segId) {
@@ -752,7 +753,7 @@ function update(dt) {
 
   if (G.dai > 0) { // 大仏変身は5秒で終わる
     G.daiT -= dt;
-    if (G.daiT <= 0) { G.dai = 0; setModel(FORMS[G.form].lv); audio.gong(); flash(0.3); shockwave(G.bx, G.by + 1, 0xfff0c0, 8); }
+    if (G.daiT <= 0) { G.dai = 0; G.chain = 0; G.lastStomp = -9; G.henCool = G.time + 20; setModel(FORMS[G.form].lv); audio.gong(); flash(0.3); shockwave(G.bx, G.by + 1, 0xfff0c0, 8); }
   }
   G.gori = Math.max(0, G.gori - dt); G.curse = Math.max(0, G.curse - dt); G.inv = Math.max(0, G.inv - dt);
   G.comboT -= dt;
@@ -783,7 +784,7 @@ function update(dt) {
 
   // 硬貨の道を先まで敷く
   extendPath(G.camY + viewHalfH + 12);
-  G.foeAcc += dt * st.foeRate * (altM() > 60 && !G.fever ? 1 : 0);
+  G.foeAcc += dt * st.foeRate * (altM() > 60 ? 1 : 0);
   while (G.foeAcc > 1) { G.foeAcc -= 1; spawnFoe(G.camY, viewHalfH); }
 
   // 硬貨：空中に止まっている。吸引中は仏像の上方の範囲から口へ引き寄せる
@@ -842,12 +843,15 @@ function update(dt) {
       if (f.waiting) { // まだ画面に入っていない高度のカラスは待機
         if (f.y > G.camY + viewHalfH + 7) continue; // 画面に入る少し前から飛び始める
         const dir = Math.random() < 0.5 ? 1 : -1;
-        f.waiting = false; f.x = -dir * (XB + 3); f.vx = dir * f.speed;
+        f.waiting = false; f.home = -dir; f.x = -dir * (XB + 3); f.vx = dir * f.speed;
         f.obj.visible = true; f.obj.rotation.y = dir > 0 ? 0 : Math.PI;
       }
       f.x += f.vx * dt; f.y += Math.sin(f.t * 3) * f.bob * dt; // 一定の高度をまっすぐ横切る
       if (f.patrol) { if (Math.abs(f.x - f.cx) > f.range) { f.x = f.cx + Math.sign(f.x - f.cx) * f.range; f.vx = -f.vx; f.obj.rotation.y = f.vx > 0 ? 0 : Math.PI; } }
-      else if (Math.abs(f.x) > XB + 0.8 && Math.sign(f.x) === Math.sign(f.vx)) { f.vx = -f.vx; f.obj.rotation.y = f.vx > 0 ? 0 : Math.PI; } // 画面の端で折り返し、その高度を行き来し続ける（落ちたときの足場になる）
+      else { // 出てきた側の画面端から、画面の4分の3まで進んで折り返す（反対側の4分の1は空く）
+        const far = -f.home * XB * 0.5, near = f.home * (XB + 0.8);
+        if ((f.vx * -f.home > 0 && f.x * -f.home > far * -f.home) || (f.vx * f.home > 0 && f.x * f.home > near * f.home)) { f.vx = -f.vx; f.obj.rotation.y = f.vx > 0 ? 0 : Math.PI; }
+      }
       f.obj.position.set(f.x, f.y, 0.3);
       const flap = Math.sin(f.t * 16) * 0.9;
       f.obj.userData.wings[0].rotation.x = -flap; f.obj.userData.wings[1].rotation.x = flap;
@@ -863,7 +867,12 @@ function update(dt) {
         // 仏像の下側で当たった＝上から踏みつけた（落ちているときは踏みやすい＝救済）
         const stomp = f.y < G.by + (G.v < -3 ? 0.95 : 0.45) * S;
         if (G.inv > 0) continue; // お守りが砕けた直後は無敵
-        if (stomp || G.dai > 0 || G.rocket > 0) { // 無敵なのは大仏変身中（と寄進の駆け上がり中）だけ
+        if (!stomp && (G.dai > 0 || G.rocket > 0)) { // 大仏の体当たり：落とすだけ（跳ねない・連鎖にならない）
+          f.dead = true; f.vy = 3; f.vx = Math.sign(f.x - G.bx || 1) * 9;
+          audio.stomp(1); emit(f.x, f.y, 0, 0x2a2a33, 16, 5, 0.8, 6); G.shake = Math.max(G.shake, 0.2);
+          continue;
+        }
+        if (stomp) { // 無敵なのは大仏変身中（と寄進の駆け上がり中）だけ
           // 撃ち落として、仏像はジャンプ（3秒以内に続けて踏むと連鎖で跳ねる力が増す）
           f.dead = true; f.vy = -4; f.vx = (f.x - G.bx) * 2 + (Math.random() - 0.5) * 2;
           G.chain = G.time - (G.lastStomp ?? -9) < 3 ? (G.chain || 0) + 1 : 1; G.lastStomp = G.time;
@@ -986,6 +995,7 @@ function absorb(c) {
 }
 
 function henshin() {
+  if (G.time < (G.henCool || 0)) return; // 続けて変身はできない
   G.dai = 1; G.daiT = 5; G.henshins++; G.v += 25; G.fovKick += 16; G.shake = 0.8;
   setModel(5);
   flash(0.9); audio.henshin();
@@ -1044,7 +1054,7 @@ function gameOver(reason = '') {
   input.down = input.key = false;
   const prevBest = best.alt;
   saveBest();
-  temple.wallet += G.money; store.set('temple', temple); // 集めた賽銭はお寺の財布に貯まる
+  G.offer = Math.round(G.money * perks().offer); temple.wallet += G.offer; store.set('temple', temple); // 集めた賽銭はお寺の財布に貯まる
   if (Math.floor(G.maxAlt || altM()) > prevBest && G.rec && G.rec.length > 20) store.set('ghost', { alt: Math.floor(G.maxAlt || altM()), pts: G.rec });
   audio.over();
   const alt = Math.floor(G.maxAlt || altM());
@@ -1056,7 +1066,7 @@ function gameOver(reason = '') {
   $('resAlt').textContent = alt.toLocaleString() + 'm';
   $('resMoney').textContent = G.money.toLocaleString();
   $('resRibbon').textContent = t('rankLabel', { r: rank(alt) });
-  $('resLines').innerHTML = [isBest ? `<b>${t('newBest')}</b>` : t('bestLine', { m: best.alt.toLocaleString() }), t('toTemple', { a: G.money.toLocaleString(), w: temple.wallet.toLocaleString() })].join('<br>');
+  $('resLines').innerHTML = [isBest ? `<b>${t('newBest')}</b>` : t('bestLine', { m: best.alt.toLocaleString() }), t('toTemple', { a: G.offer.toLocaleString(), w: temple.wallet.toLocaleString() })].join('<br>');
   $('resNext').textContent = t('again');
   show('result', true); show('hud', false);
 }
