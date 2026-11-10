@@ -2,19 +2,19 @@
 import * as THREE from 'three';
 import { canvasTex, glowTexture, dotTexture, buildBuddha, MAT } from './models.js';
 
-export const UNIT_M = 4; // 1ユニット = 4m
+export const UNIT_M = 6; // 1ユニット = 6m
 
 // ---------- 高度ごとの空と光（キーフレーム） ----------
 const K = [
   { m: 0,    top: 0x3a76c4, hor: 0xcfe5f5, bot: 0x7d8f74, fog: 0xc2d8e8, near: 60, far: 420, sun: 0xfff0d6, sunI: 2.6, sky: 0xd6ecff, gnd: 0x6a5838, hemiI: 1.1, stars: 0, elev: 0.55 },
-  { m: 400,  top: 0x2c66b6, hor: 0xd9ecf8, bot: 0x9fb0a8, fog: 0xcfe2ef, near: 80, far: 520, sun: 0xfff2dc, sunI: 2.6, sky: 0xd6ecff, gnd: 0x7a6a50, hemiI: 1.1, stars: 0, elev: 0.5 },
-  { m: 900,  top: 0x2457a6, hor: 0xeef6fc, bot: 0xf4f8fb, fog: 0xe7f0f7, near: 70, far: 520, sun: 0xfff4e2, sunI: 2.8, sky: 0xe8f4ff, gnd: 0xd0d8e0, hemiI: 1.2, stars: 0, elev: 0.45 },
-  { m: 1500, top: 0x1d3f8c, hor: 0xffd0a0, bot: 0xffe3c8, fog: 0xf2d4bb, near: 70, far: 520, sun: 0xffc488, sunI: 2.6, sky: 0xffe0c0, gnd: 0xc08060, hemiI: 1.0, stars: 0, elev: 0.14 },
-  { m: 1900, top: 0x0b1440, hor: 0xe2825c, bot: 0x2c1c3c, fog: 0x6a4a68, near: 60, far: 600, sun: 0xff9a60, sunI: 1.8, sky: 0x8a6aa0, gnd: 0x302040, hemiI: 0.8, stars: 0.6, elev: 0.04 },
-  { m: 2200, top: 0x02030c, hor: 0x1a2a64, bot: 0x050818, fog: 0x101832, near: 80, far: 700, sun: 0xc8d6ff, sunI: 1.3, sky: 0x4050a0, gnd: 0x101020, hemiI: 0.7, stars: 1, elev: 0.3 },
-  { m: 2380, top: 0x2b1a44, hor: 0xffaa6a, bot: 0x6a3a40, fog: 0xc08a70, near: 60, far: 600, sun: 0xffd4a0, sunI: 2.2, sky: 0xffc0a0, gnd: 0x804050, hemiI: 0.9, stars: 0.35, elev: 0.2 },
-  { m: 2550, top: 0xf0a2c6, hor: 0xffe6ae, bot: 0xfff0dc, fog: 0xffdcc8, near: 80, far: 900, sun: 0xfff0d0, sunI: 3.0, sky: 0xffe8f0, gnd: 0xffd0a0, hemiI: 1.3, stars: 0, elev: 0.6 },
-  { m: 3200, top: 0xf8c2dc, hor: 0xfff4d4, bot: 0xffffff, fog: 0xffefe0, near: 90, far: 1100, sun: 0xfff6e0, sunI: 3.2, sky: 0xfff0f4, gnd: 0xffe0b0, hemiI: 1.4, stars: 0, elev: 0.7 },
+  { m: 600,  top: 0x2c66b6, hor: 0xd9ecf8, bot: 0x9fb0a8, fog: 0xcfe2ef, near: 80, far: 520, sun: 0xfff2dc, sunI: 2.6, sky: 0xd6ecff, gnd: 0x7a6a50, hemiI: 1.1, stars: 0, elev: 0.5 },
+  { m: 1350,  top: 0x2457a6, hor: 0xeef6fc, bot: 0xf4f8fb, fog: 0xe7f0f7, near: 70, far: 520, sun: 0xfff4e2, sunI: 2.8, sky: 0xe8f4ff, gnd: 0xd0d8e0, hemiI: 1.2, stars: 0, elev: 0.45 },
+  { m: 2250, top: 0x1d3f8c, hor: 0xffd0a0, bot: 0xffe3c8, fog: 0xf2d4bb, near: 70, far: 520, sun: 0xffc488, sunI: 2.6, sky: 0xffe0c0, gnd: 0xc08060, hemiI: 1.0, stars: 0, elev: 0.14 },
+  { m: 2850, top: 0x0b1440, hor: 0xe2825c, bot: 0x2c1c3c, fog: 0x6a4a68, near: 60, far: 600, sun: 0xff9a60, sunI: 1.8, sky: 0x8a6aa0, gnd: 0x302040, hemiI: 0.8, stars: 0.6, elev: 0.04 },
+  { m: 3300, top: 0x02030c, hor: 0x1a2a64, bot: 0x050818, fog: 0x101832, near: 80, far: 700, sun: 0xc8d6ff, sunI: 1.3, sky: 0x4050a0, gnd: 0x101020, hemiI: 0.7, stars: 1, elev: 0.3 },
+  { m: 3570, top: 0x2b1a44, hor: 0xffaa6a, bot: 0x6a3a40, fog: 0xc08a70, near: 60, far: 600, sun: 0xffd4a0, sunI: 2.2, sky: 0xffc0a0, gnd: 0x804050, hemiI: 0.9, stars: 0.35, elev: 0.2 },
+  { m: 3825, top: 0xf0a2c6, hor: 0xffe6ae, bot: 0xfff0dc, fog: 0xffdcc8, near: 80, far: 900, sun: 0xfff0d0, sunI: 3.0, sky: 0xffe8f0, gnd: 0xffd0a0, hemiI: 1.3, stars: 0, elev: 0.6 },
+  { m: 4800, top: 0xf8c2dc, hor: 0xfff4d4, bot: 0xffffff, fog: 0xffefe0, near: 90, far: 1100, sun: 0xfff6e0, sunI: 3.2, sky: 0xfff0f4, gnd: 0xffe0b0, hemiI: 1.4, stars: 0, elev: 0.7 },
 ];
 const tmpA = new THREE.Color(), tmpB = new THREE.Color();
 function lerpC(a, b, t, out) { tmpA.setHex(a); tmpB.setHex(b); return out.copy(tmpA).lerp(tmpB, t); }

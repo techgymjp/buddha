@@ -35,7 +35,7 @@ export class AudioEngine {
     this.musicSend = ctx.createGain(); this.musicSend.gain.value = 0.7;
     this.music.connect(this.musicSend).connect(this.reverb);
 
-    this.sfx = ctx.createGain(); this.sfx.gain.value = 0.8;
+    this.sfx = ctx.createGain(); this.sfx.gain.value = 1.0;
     this.sfx.connect(this.master);
     const sfxSend = ctx.createGain(); sfxSend.gain.value = 0.25;
     this.sfx.connect(sfxSend).connect(this.reverb);
@@ -262,12 +262,63 @@ export class AudioEngine {
     const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + dur * 0.3); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     src.connect(f).connect(g).connect(this.sfx); src.start(t);
   }
-  coin(p = 0) {
-    const now = performance.now(); if (now - this.lastCoin < 35) return; this.lastCoin = now;
-    this.tone(1900 + p * 30, 0.06, 'square', 0.025); this.tone(2800 + p * 30, 0.14, 'sine', 0.05, 0.03);
+  // 金属の「チン」：非整数倍音が速く減衰する
+  metal(f, when, gain, decay = 0.35, pan = 0) {
+    const ctx = this.ctx;
+    const out = ctx.createGain(); out.gain.value = gain;
+    let node = out;
+    if (ctx.createStereoPanner) { const p = ctx.createStereoPanner(); p.pan.value = pan; out.connect(p); node = p; }
+    node.connect(this.sfx);
+    const ratios = [1, 2.32, 3.68, 5.12, 6.9], amps = [0.5, 0.36, 0.24, 0.14, 0.08];
+    ratios.forEach((r, i) => {
+      const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = f * r * (1 + (Math.random() - 0.5) * 0.004);
+      const g = ctx.createGain(); const d = decay / (1 + i * 0.7);
+      g.gain.setValueAtTime(0.0001, when); g.gain.exponentialRampToValueAtTime(amps[i], when + 0.002); g.gain.exponentialRampToValueAtTime(0.0001, when + d);
+      o.connect(g).connect(out); o.start(when); o.stop(when + d + 0.02);
+    });
+    // 当たった瞬間の「カッ」
+    const len = Math.floor(ctx.sampleRate * 0.012), buf = ctx.createBuffer(1, len, ctx.sampleRate), dd = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) dd[i] = (Math.random() * 2 - 1) * (1 - i / len);
+    const src = ctx.createBufferSource(); src.buffer = buf;
+    const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 3500;
+    const cg = ctx.createGain(); cg.gain.value = 0.5;
+    src.connect(hp).connect(cg).connect(out); src.start(when);
   }
-  koban() { [1200, 1600, 2000, 2600].forEach((f, i) => this.tone(f, 0.18, 'triangle', 0.07, i * 0.045)); this.boost(0.5); }
-  goriyaku() { [784, 988, 1175, 1568, 1976].forEach((f, i) => this.tone(f, 0.4, 'triangle', 0.08, i * 0.07)); this.boost(1); }
+  // 銅銭：チャリン（連続で吸うほど音程が上がる）
+  coin(p = 0) {
+    if (!this.ctx) return;
+    const now = performance.now(); if (now - this.lastCoin < 28) return; this.lastCoin = now;
+    const t = this.ctx.currentTime;
+    const f = 1650 * Math.pow(2, Math.min(p, 24) / 24) * (1 + (Math.random() - 0.5) * 0.04);
+    const pan = (Math.random() - 0.5) * 0.5;
+    this.metal(f, t, 0.32, 0.32, pan);
+    this.metal(f * 1.19, t + 0.045 + Math.random() * 0.02, 0.22, 0.4, pan);
+  }
+  // 小判：ジャラッ＋ズン（加速）
+  koban() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    for (let i = 0; i < 6; i++) this.metal(1150 + Math.random() * 500, t + i * 0.025 + Math.random() * 0.02, 0.22, 0.5, (Math.random() - 0.5) * 0.8);
+    this.metal(2600, t + 0.05, 0.28, 0.9);
+    this.thump(0.9); this.boost(0.5);
+  }
+  // 黄金の御利益コイン：きらめく鈴
+  goriyaku() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    [1568, 1976, 2349, 3136, 3951].forEach((f, i) => this.metal(f, t + i * 0.06, 0.25, 1.2, (i - 2) * 0.2));
+    [784, 988, 1175].forEach((f, i) => this.tone(f, 0.8, 'triangle', 0.06, i * 0.05));
+    this.thump(1.2); this.boost(1);
+  }
+  // 加速の「ズン」
+  thump(k = 1) {
+    const ctx = this.ctx; if (!ctx) return;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator(); o.type = 'sine';
+    o.frequency.setValueAtTime(110, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.25);
+    const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.35 * k, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+    o.connect(g).connect(this.sfx); o.start(t); o.stop(t + 0.4);
+  }
   curse() { this.tone(300, 0.5, 'sawtooth', 0.09, 0, -220); this.tone(207, 0.6, 'square', 0.04, 0.1, -120); }
   hit() { this.tone(160, 0.35, 'sawtooth', 0.11, 0, -100); this.noise(0.3, 800, 200, 0.2); }
   thunder() { this.noise(0.9, 1200, 80, 0.5); }

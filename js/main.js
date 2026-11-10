@@ -16,11 +16,11 @@ const store = {
 
 // ---------- 定数 ----------
 const STAGES = [
-  { name: '地上の寺院', goal: 400, curse: 0.07, foeRate: 0.2, foes: ['crow'], drain: 4.5 },
-  { name: '山頂',       goal: 500, curse: 0.11, foeRate: 0.3, foes: ['crow', 'crow', 'thunder'], drain: 5.5 },
-  { name: '雲海',       goal: 600, curse: 0.15, foeRate: 0.38, foes: ['thunder', 'crow'], drain: 6.5 },
-  { name: '天空',       goal: 700, curse: 0.19, foeRate: 0.42, foes: ['thunder'], drain: 7.5 },
-  { name: '極楽浄土',   goal: 800, curse: 0.22, foeRate: 0, foes: [], drain: 8 },
+  { name: '地上の寺院', goal: 600, curse: 0.07, foeRate: 0.2, foes: ['crow'], grav: 4.4 },
+  { name: '山頂',       goal: 750, curse: 0.11, foeRate: 0.3, foes: ['crow', 'crow', 'thunder'], grav: 5.6 },
+  { name: '雲海',       goal: 900, curse: 0.15, foeRate: 0.38, foes: ['thunder', 'crow'], grav: 6.2 },
+  { name: '天空',       goal: 1050, curse: 0.19, foeRate: 0.42, foes: ['thunder'], grav: 6.8 },
+  { name: '極楽浄土',   goal: 1200, curse: 0.22, foeRate: 0, foes: [], grav: 7.4 },
 ];
 let acc = 0; STAGES.forEach((s) => { s.start = acc; acc += s.goal; });
 const FORMS = [
@@ -31,10 +31,10 @@ const FORMS = [
   { lv: 5, name: '黄金の大仏', need: 8000, scale: 1.35 },
 ];
 const COINS = {
-  zeni: { money: 10, energy: 3, r: 0.46, boost: 0.45, w: 70 },
-  koban: { money: 300, energy: 14, r: 0.6, boost: 3.5, w: 9 },
-  goriyaku: { money: 500, energy: 30, r: 0.45, boost: 10, w: 2.2 },
-  noroi: { money: 0, energy: -18, r: 0.38, boost: 0, w: 0 },
+  zeni: { money: 10, r: 0.46, boost: 1.5, w: 70 },
+  koban: { money: 300, r: 0.6, boost: 6, w: 9 },
+  goriyaku: { money: 500, r: 0.45, boost: 12, w: 2.2 },
+  noroi: { money: 0, r: 0.38, boost: -8, w: 0 },
 };
 const FEVER_AT = 0.78, HENSHIN_NEED = 25;
 const XB = 5.6;           // 左右の移動範囲
@@ -90,15 +90,35 @@ function setModel(lv) {
 setModel(1);
 const aura = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture, color: 0xffc860, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.4 }));
 aura.position.set(0, 1.2, -0.3); buddhaRoot.add(aura);
-// 吸引の渦
+// 吸い上げの渦（仏像の真下に伸びる黄金の竜巻）
 const swirl = new THREE.Group(); scene.add(swirl);
+const vortexTex = (() => {
+  const c = document.createElement('canvas'); c.width = 256; c.height = 256;
+  const g = c.getContext('2d');
+  for (let i = 0; i < 6; i++) { // 斜めの光の筋
+    const x = i * 256 / 6;
+    const lg = g.createLinearGradient(x, 0, x + 40, 0);
+    lg.addColorStop(0, 'rgba(255,220,130,0)'); lg.addColorStop(0.5, 'rgba(255,240,190,1)'); lg.addColorStop(1, 'rgba(255,220,130,0)');
+    g.save(); g.transform(1, 0, -0.6, 1, 0, 0); g.fillStyle = lg; g.fillRect(x, 0, 40, 256); g.fillRect(x + 256, 0, 40, 256); g.restore();
+  }
+  g.globalCompositeOperation = 'destination-in';
+  const v = g.createLinearGradient(0, 0, 0, 256); v.addColorStop(0, 'rgba(0,0,0,1)'); v.addColorStop(0.75, 'rgba(0,0,0,.6)'); v.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = v; g.fillRect(0, 0, 256, 256);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
+})();
+const vortexMat = new THREE.MeshBasicMaterial({ map: vortexTex, color: 0xffd889, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false });
+const vortex = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 1, 1, 40, 1, true), vortexMat);
+vortex.geometry.translate(0, -0.5, 0); // 上端を原点に
+swirl.add(vortex);
+const vortex2 = new THREE.Mesh(vortex.geometry, vortexMat.clone()); vortex2.material.opacity = 0.3; swirl.add(vortex2);
 const swirlRings = [];
-for (let i = 0; i < 4; i++) {
-  const m = new THREE.Mesh(new THREE.RingGeometry(0.96, 1, 64), new THREE.MeshBasicMaterial({ color: 0xffe6a0, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }));
-  swirl.add(m); swirlRings.push(m);
+for (let i = 0; i < 6; i++) {
+  const m = new THREE.Mesh(new THREE.RingGeometry(0.92, 1, 64), new THREE.MeshBasicMaterial({ color: 0xffe6a0, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }));
+  m.rotation.x = -Math.PI / 2 + 0.45; swirl.add(m); swirlRings.push(m);
 }
-const swirlDisc = new THREE.Mesh(new THREE.CircleGeometry(1, 64), new THREE.MeshBasicMaterial({ map: glowTexture, color: 0xffd070, transparent: true, opacity: 0.18, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
-swirl.add(swirlDisc);
+// 加速の噴射（台座の下）
+const jet = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture, color: 0xffcf70, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+jet.center.set(0.5, 0.85); jet.position.set(0, -0.8, 0.1); buddhaRoot.add(jet);
 
 // ---------- パーティクル ----------
 const MAXP = 1600;
@@ -253,9 +273,9 @@ function togglePause() {
 let G = null;
 function newGameState() {
   return {
-    stage: 0, money: 0, score: 0, form: 0, energy: 80, maxCombo: 0, henshins: 0,
-    bx: 0, by: 0.8, bvx: 0, v: 0, camY: 3, mouth: 0,
-    coins: [], foes: [], spawnY: 4, foeAcc: 0,
+    stage: 0, money: 0, score: 0, form: 0, maxCombo: 0, henshins: 0,
+    bx: 0, by: 1.2, bvx: 0, v: 16, camY: 2.2, mouth: 0,
+    coins: [], foes: [], queue: [], spawnAcc: 0, foeAcc: 0, accSm: 0, thrust: 0, lift: 0,
     combo: 0, comboT: 0, gori: 0, curse: 0, inv: 0, dai: 0,
     fever: false, feverCount: 0, stageMoney: 0, fovKick: 0, shake: 0, time: 0,
   };
@@ -270,7 +290,7 @@ function startGame() {
 }
 function beginStage(i) {
   G.stage = i;
-  G.energy = Math.max(G.energy, 75);
+  G.v = Math.max(G.v, 14);
   G.fever = false; G.feverCount = 0; G.stageMoney = 0; G.dai = 0; G.gori = 0; G.curse = 0;
   setModel(FORMS[G.form].lv);
   state = 'play';
@@ -292,34 +312,42 @@ function clearWorldObjects() {
   for (const f of G.foes) scene.remove(f.obj);
 }
 
-// ---------- 生成 ----------
-function spawnCoins(y) {
+// ---------- 生成：硬貨は下から噴き上がってくる ----------
+const GRAV = 3.2; // 仏像から見た硬貨の重力（吸わなければ放物線を描いて落ちていく）
+function pickType() {
   const st = STAGES[G.stage];
-  let type;
-  if (G.fever) type = Math.random() < 0.12 ? 'koban' : 'zeni';
-  else if (Math.random() < st.curse) type = 'noroi';
-  else {
-    const w = [COINS.zeni.w, COINS.koban.w + G.stage, COINS.goriyaku.w];
-    const r = Math.random() * (w[0] + w[1] + w[2]);
-    type = r < w[0] ? 'zeni' : r < w[0] + w[1] ? 'koban' : 'goriyaku';
+  if (G.fever) return Math.random() < 0.14 ? 'koban' : 'zeni';
+  if (Math.random() < st.curse) return 'noroi';
+  const w = [COINS.zeni.w, COINS.koban.w + G.stage, COINS.goriyaku.w];
+  const r = Math.random() * (w[0] + w[1] + w[2]);
+  return r < w[0] ? 'zeni' : r < w[0] + w[1] ? 'koban' : 'goriyaku';
+}
+// 硬貨の群れを予約（流れ・らせん・噴水）
+function queueGroup() {
+  const t0 = G.time;
+  const x0 = (Math.random() - 0.5) * 2 * (XB - 0.5);
+  const kind = Math.random();
+  const lift = () => 6.6 + Math.random() * 1.6;
+  if (kind < 0.38) { // 一筋の流れ（途中に呪いの銭が混じることも）
+    const n = 4 + (Math.random() * 6 | 0), v = lift();
+    const bad = !G.fever && Math.random() < STAGES[G.stage].curse * 2.2 ? 1 + (Math.random() * (n - 2) | 0) : -1;
+    for (let i = 0; i < n; i++) G.queue.push({ t: t0 + i * 0.13, type: i === bad ? 'noroi' : 'zeni', x: x0, rvx: (Math.random() - 0.5) * 0.3, rvy: v + i * 0.05, helix: 0 });
+  } else if (kind < 0.62) { // らせん
+    const n = 7 + (Math.random() * 6 | 0), v = lift();
+    for (let i = 0; i < n; i++) G.queue.push({ t: t0 + i * 0.1, type: 'zeni', x: x0, rvx: 0, rvy: v, helix: 1.1, hph: i * 0.75 });
+  } else if (kind < 0.8) { // 噴水
+    const n = 5 + (Math.random() * 5 | 0);
+    for (let i = 0; i < n; i++) G.queue.push({ t: t0 + Math.random() * 0.25, type: Math.random() < 0.15 ? 'koban' : 'zeni', x: x0, rvx: (Math.random() - 0.5) * 4, rvy: lift() - 0.4, helix: 0 });
+  } else { // 単発（小判・御利益・呪い）
+    G.queue.push({ t: t0, type: pickType(), x: x0, rvx: (Math.random() - 0.5) * 0.8, rvy: lift() + 0.6, helix: 0 });
   }
-  let n = 1;
-  if (type === 'zeni') n = Math.random() < 0.55 ? 3 + (Math.random() * 6 | 0) : 1;
-  if (type === 'noroi' && Math.random() < 0.3) n = 2;
-  const cx = (Math.random() - 0.5) * 2 * (XB - 0.3);
-  const pattern = Math.random();
-  for (let i = 0; i < n; i++) {
-    let x, yy;
-    if (pattern < 0.3) { x = cx + (i - n / 2) * 0.75; yy = y; }               // 横一列
-    else if (pattern < 0.55) { x = cx + Math.sin(i * 0.9) * 1.6; yy = y + i * 0.8; } // 蛇行
-    else { x = cx + (Math.random() - 0.5) * 2.4; yy = y + Math.random() * 2; }
-    x = THREE.MathUtils.clamp(x, -XB, XB);
-    const obj = makeCoinMesh(type);
-    obj.position.set(x, yy, (Math.random() - 0.5) * 0.6);
-    obj.scale.setScalar(1.15);
-    scene.add(obj);
-    G.coins.push({ type, obj, x, y: yy, z: obj.position.z, vx: 0, vy: 0, spin: Math.random() * 6, ph: Math.random() * 6, pulled: false });
-  }
+}
+function launchCoin(q) {
+  const obj = makeCoinMesh(q.type);
+  let y = G.camY - viewHalfH - 1;
+  if (y < -0.8) { y = -0.8; q.x = THREE.MathUtils.clamp(q.x * 0.45, -2.4, 2.4); q.rvy *= 0.62; } // 地上では賽銭鉢から噴き上がる
+  obj.position.set(q.x, y, 0); obj.scale.setScalar(1.15); scene.add(obj);
+  G.coins.push({ type: q.type, obj, x: q.x, y, z: 0, rvx: q.rvx, rvy: q.rvy, helix: q.helix, hph: q.hph || 0, spin: Math.random() * 6, ph: Math.random() * 6, pulled: false });
 }
 function spawnFoe(cy, halfH) {
   const st = STAGES[G.stage];
@@ -328,7 +356,7 @@ function spawnFoe(cy, halfH) {
   if (kind === 'crow') {
     const dir = Math.random() < 0.5 ? 1 : -1;
     const obj = makeCrow(); obj.scale.setScalar(1.3);
-    const y = G.by + 5 + Math.random() * 8;
+    const y = G.by - 2 + Math.random() * 5;
     obj.position.set(-dir * 12, y, 0.3); obj.rotation.y = dir > 0 ? 0 : Math.PI; scene.add(obj);
     G.foes.push({ kind, obj, x: -dir * 12, y, vx: dir * (3.5 + Math.random() * 2 + G.stage * 0.6), t: 0, r: 0.7 });
   } else {
@@ -362,12 +390,14 @@ function suckR() {
   return G.gori > 0 ? r * 1.7 : r;
 }
 const suckPow = () => 42 + G.form * 6 + (G.gori > 0 ? 30 : 0) + (G.dai > 0 ? 60 : 0);
-function topSpeed() {
-  let vt = 14 + G.form * 2.5 + Math.min(8, G.combo * 0.25) + (G.gori > 0 ? 14 : 0) + (G.dai > 0 ? 34 : 0);
-  if (G.fever && G.dai <= 0) vt = Math.min(vt, 13);
-  return vt;
+// 最高速度（仏像が大きいほど・御利益中・大仏で上がる）
+function maxSpeed() {
+  let vm = 26 + G.form * 3.5 + (G.gori > 0 ? 10 : 0) + (G.dai > 0 ? 40 : 0);
+  if (G.fever && G.dai <= 0) vm = Math.min(vm, 20); // 賽銭の嵐では吸い込む時間をつくる
+  return vm;
 }
 const altM = () => Math.max(0, G.by * UNIT_M);
+window.__altM = () => altM();
 
 // ---------- 更新 ----------
 const mouthW = new THREE.Vector3();
@@ -390,16 +420,13 @@ function update(dt) {
   G.sucking = sucking;
   G.mouth += ((sucking ? 1 : 0) - G.mouth) * Math.min(1, dt * 12);
 
-  // 法力と上昇（慣性つきの加速）
-  if (G.gori <= 0 && G.dai <= 0) G.energy = Math.max(0, G.energy - st.drain * dt);
-  if (G.energy > 0) {
-    const vt = topSpeed();
-    G.v += (vt - G.v) * (G.v < vt ? 0.75 : 1.1) * dt;
-    G.v = Math.min(G.v, vt + 22); // 加速の上乗せには上限
-  } else {
-    G.v = Math.max(-30, G.v - 16 * dt);
-    if (Math.random() < dt * 1.5) floatText(G.bx, G.by + 3, 0, '法力切れ…お金を吸え！', '#ffb0b0', 18, 0.8);
-  }
+  // 上昇の勢い：吸った硬貨で加速し、吸わなければ重力で減速する
+  if (G.dai > 0) G.v += 40 * dt;
+  else G.v += ((G.gori > 0 ? 10 : 0) - st.grav) * dt;
+  const vm = maxSpeed();
+  if (G.v > vm) G.v += (vm - G.v) * Math.min(1, 2 * dt);
+  G.v = Math.max(-22, G.v);
+  if (G.v < 0 && Math.random() < dt * 1.2) floatText(G.bx, G.by + 3.2, 0, '勢いが尽きた…吸い上げろ！', '#ffb0b0', 18, 0.8);
   G.by += (G.v / UNIT_M) * dt;
   G.score += Math.max(0, G.v) * dt * (G.dai > 0 ? 3 : 1) | 0;
 
@@ -417,50 +444,57 @@ function update(dt) {
   G.fovKick *= Math.pow(0.15, dt); G.shake *= Math.pow(0.05, dt);
 
   // カメラ追従（落下中は追わない）
-  const lead = Math.min(3.5, Math.max(0, G.v) * 0.07);
-  const camTarget = G.by + 1.6 + lead;
-  if (G.energy > 0 || camTarget > G.camY) G.camY += (camTarget - G.camY) * Math.min(1, dt * 4);
+  // 加速度を平滑化 → 加速した分だけ仏像が画面の上へ押し出され、カメラが遅れて追いつく
+  const accel = (G.v - (G.prevV ?? G.v)) / Math.max(dt, 1e-3); G.prevV = G.v;
+  G.accSm += (accel - G.accSm) * Math.min(1, dt * 6);
+  const liftTarget = THREE.MathUtils.clamp(G.accSm * 0.09, -0.6, 2.8);
+  G.lift += (liftTarget - G.lift) * Math.min(1, dt * (liftTarget > G.lift ? 9 : 2.2));
+  G.thrust = Math.max(G.gori > 0 || G.dai > 0 ? 1.2 : 0, G.thrust - dt * 2.2);
+  const camTarget = Math.max(2.2, G.by - 3.4 - G.lift); // 地上ではカメラを地面より下げない
+  if (camTarget > G.camY) G.camY += (camTarget - G.camY) * Math.min(1, dt * 5); // 落ちるときはカメラは追わない
   if (G.by < G.camY - viewHalfH - 3) { gameOver(); return; }
 
-  // 硬貨の生成
-  const gap = G.fever ? 0.4 : 1.55 - G.stage * 0.06;
-  while (G.spawnY < G.camY + viewHalfH + 8) { spawnCoins(G.spawnY); G.spawnY += gap * (0.7 + Math.random() * 0.6); }
+  // 硬貨の噴き上げ（時間で予約 → 画面の下から発射）
+  G.spawnAcc += dt * (G.fever ? 3.6 : 0.95 + G.stage * 0.1);
+  while (G.spawnAcc > 1) { G.spawnAcc -= 1; queueGroup(); }
+  for (let i = G.queue.length - 1; i >= 0; i--) if (G.queue[i].t <= G.time) { launchCoin(G.queue[i]); G.queue.splice(i, 1); }
   G.foeAcc += dt * st.foeRate * (altM() > 60 && !G.fever ? 1 : 0);
   while (G.foeAcc > 1) { G.foeAcc -= 1; spawnFoe(G.camY, viewHalfH); }
 
-  // 硬貨
+  // 硬貨（仏像と一緒に動く座標系で、下から上がって重力で落ちる）
   const R = suckR(), P = suckPow();
   mouthW.set(G.bx, G.by + 1.85 * S, 0.4 * S);
+  const tx = G.bx, ty = G.by + 0.9 * S;                 // 吸い込む先（体）
+  const cx = G.bx, cy = G.by + 0.6 * S - R * 0.7;       // 吸引範囲は仏像の下に伸びる
+  const rx = R * 0.9, ry = R * 1.5;
+  G.suck = { cx, cy, rx, ry, tx, ty };
   const bvy = G.v / UNIT_M;
-  const damp = Math.pow(0.012, dt);
+  const damp = Math.pow(0.02, dt);
   for (let i = G.coins.length - 1; i >= 0; i--) {
     const c = G.coins[i];
-    c.spin += dt * (c.pulled ? 14 : c.type === 'noroi' ? 1.5 : 2.5); c.ph += dt * 2;
-    const dx = mouthW.x - c.x, dy = mouthW.y - c.y, d = Math.hypot(dx, dy) || 1e-3;
-    if (sucking && d < R) {
-      // 仏像と一緒に動く座標系で引き寄せる
-      let rvx = c.vx - G.bvx * 0.6, rvy = c.vy - bvy;
-      const f = P * (1.2 - d / R * 0.75);
-      rvx += (dx / d * f - dy / d * f * 0.3) * dt;
-      rvy += (dy / d * f + dx / d * f * 0.3) * dt;
-      rvx *= damp; rvy *= damp;
-      c.vx = rvx + G.bvx * 0.6; c.vy = rvy + bvy;
+    c.spin += dt * (c.pulled ? 14 : c.type === 'noroi' ? 1.5 : 3); c.ph += dt * 2;
+    const ex = (c.x - cx) / rx, ey = (c.y - cy) / ry;
+    const dx = tx - c.x, dy = ty - c.y, d = Math.hypot(dx, dy) || 1e-3;
+    if (sucking && ex * ex + ey * ey < 1) {
+      const f = P * (1.25 - Math.min(1, d / (R * 1.6)) * 0.6);
+      c.rvx += (dx / d * f) * dt + Math.cos(G.time * 9 + c.ph * 3) * 6 * dt; // 渦を巻きながら
+      c.rvy += (dy / d * f) * dt;
+      c.rvx *= damp; c.rvy *= damp;
       c.pulled = true;
-      if (Math.random() < dt * 8) emit(c.x, c.y, c.z, c.type === 'noroi' ? 0x9a40ff : 0xffe6a0, 1, 0.5, 0.4);
+      if (Math.random() < dt * 10) emit(c.x, c.y, c.z, c.type === 'noroi' ? 0x9a40ff : 0xffe6a0, 1, 0.5, 0.4);
     } else {
-      c.vx *= Math.pow(0.1, dt); c.vy *= Math.pow(0.1, dt); c.pulled = false;
-      c.x += Math.sin(c.ph) * (c.type === 'noroi' ? 0.7 : 0.25) * dt;
+      c.rvy -= GRAV * dt; c.pulled = false;
+      if (c.helix) c.rvx = Math.cos(G.time * 4 + c.hph) * c.helix;
     }
-    c.x += c.vx * dt; c.y += c.vy * dt;
-    c.z += (0 - c.z) * (c.pulled ? dt * 4 : 0);
-    const grab = sucking ? 0.5 * S + COINS[c.type].r * 0.4 : 0.95 * S;
-    const gd = sucking ? d : Math.hypot(G.bx - c.x, G.by + 1.0 * S - c.y);
-    if (gd < grab) { absorb(c); scene.remove(c.obj); G.coins.splice(i, 1); continue; }
-    if (c.y < G.camY - viewHalfH - 6) { scene.remove(c.obj); G.coins.splice(i, 1); continue; }
+    c.x += c.rvx * dt; c.y += (bvy + c.rvy) * dt;
+    c.z = c.helix && !c.pulled ? Math.sin(G.time * 4 + c.hph) * c.helix : c.z * Math.pow(0.02, dt);
+    const grab = sucking ? 0.6 * S + COINS[c.type].r * 0.4 : 0.95 * S;
+    if (d < grab) { absorb(c); scene.remove(c.obj); G.coins.splice(i, 1); continue; }
+    if ((c.rvy < 0 && c.y < G.camY - viewHalfH - 3) || c.y > G.camY + viewHalfH + 6 || Math.abs(c.x) > 14) { scene.remove(c.obj); G.coins.splice(i, 1); continue; }
     c.obj.position.set(c.x, c.y, c.z);
-    const shrink = c.pulled ? THREE.MathUtils.clamp(d / 2.2, 0.35, 1) : 1;
+    const shrink = c.pulled ? THREE.MathUtils.clamp(d / 2.0, 0.35, 1) : 1;
     c.obj.scale.setScalar(1.15 * shrink);
-    c.obj.userData.mesh.rotation.set(Math.sin(c.ph) * 0.35, c.spin, Math.sin(c.ph * 0.7) * 0.2);
+    c.obj.userData.mesh.rotation.set(Math.sin(c.ph) * 0.35 + 0.25, c.spin, Math.sin(c.ph * 0.7) * 0.2);
     if (c.obj.userData.glow && c.type === 'goriyaku') c.obj.userData.glow.material.opacity = 0.7 + Math.sin(G.time * 6) * 0.2;
   }
 
@@ -478,7 +512,7 @@ function update(dt) {
         if (G.inv <= 0) {
           const stolen = Math.min(G.money, 30 + G.stage * 30);
           G.money -= stolen;
-          hurt(8, `カラスに ¥${stolen} 奪われた！`);
+          hurt(6, `カラスに ¥${stolen} 奪われた！`);
         }
       }
       if (Math.abs(f.x) > 16) { scene.remove(f.obj); G.foes.splice(i, 1); continue; }
@@ -491,7 +525,7 @@ function update(dt) {
       if (striking && !f.struck) {
         f.struck = true; f.bolt.geometry.dispose(); f.bolt.geometry = boltGeometry(); f.bolt.visible = true;
         audio.thunder(); flash(0.25);
-        if (Math.abs(G.bx - f.x) < 0.6 + 0.4 * S && G.by < f.y && G.by > f.y - 24) hurt(18, '落雷！ 法力 -18');
+        if (Math.abs(G.bx - f.x) < 0.6 + 0.4 * S && G.by < f.y && G.by > f.y - 24) hurt(10, '落雷！ 失速');
       }
       if (!striking) { f.struck = false; f.bolt.visible = false; }
       if (f.y < G.camY - viewHalfH - 8) { scene.remove(f.obj); G.foes.splice(i, 1); continue; }
@@ -499,7 +533,7 @@ function update(dt) {
   }
 
   // 尾を引く光の粒（速いほど長い軌跡）
-  if (G.energy > 0) {
+  if (G.v > 0) {
     const n = 2 + Math.floor(Math.max(0, G.v) * 0.25);
     for (let k = 0; k < n; k++) {
       parts.length < MAXP && parts.push({ x: G.bx + (Math.random() - 0.5) * 1.4 * S, y: G.by - 0.7 * S + (Math.random() - 0.5) * 0.3, z: (Math.random() - 0.5) * 0.8, vx: (Math.random() - 0.5) * 0.6, vy: -0.6 - Math.random(), vz: 0, life: 0.9, max: 0.9, r: 1, g: G.dai > 0 || G.gori > 0 ? 0.95 : 0.78, b: G.dai > 0 || G.gori > 0 ? 0.7 : 0.35, grav: 0 });
@@ -509,8 +543,8 @@ function update(dt) {
 
 function hurt(amount, label) {
   if (G.inv > 0 || G.dai > 0 || G.gori > 0) return;
-  G.energy = Math.max(0, G.energy - amount);
-  G.inv = 1.2; G.combo = 0; G.shake = 0.5; G.v *= 0.6;
+  G.v -= amount; // 勢いを失う
+  G.inv = 1.2; G.combo = 0; G.shake = 0.5;
   audio.hit(); flash(0.2);
   floatText(G.bx, G.by + 3.6, 0, label, '#ff8a7a', 20, 1.1);
 }
@@ -522,8 +556,8 @@ function absorb(c) {
     if (G.gori > 0 || G.dai > 0) { G.score += 150; emit(c.x, c.y, 0, 0xe0c0ff, 14, 4); floatText(c.x, c.y, 0, '呪い浄化 +150', '#f0d8ff', 18); audio.coin(12); return; }
     const lost = Math.min(G.money, Math.floor(G.money * 0.06) + 30);
     G.money -= lost;
-    G.energy = Math.max(0, G.energy + d.energy);
-    G.curse = 1.3; G.combo = 0; G.v *= 0.55; G.shake = 0.6;
+    G.v += d.boost; // 失速
+    G.curse = 1.3; G.combo = 0; G.shake = 0.6;
     audio.curse(); flash(0.15);
     emit(c.x, c.y, 0, 0x8a20ff, 40, 6, 1);
     floatText(G.bx, G.by + 4, 0, '呪いの銭！ 呪縛で吸えない', '#e6a0ff', 20, 1.2);
@@ -534,8 +568,11 @@ function absorb(c) {
   const mult = 1 + Math.min(4, Math.floor(G.combo / 15));
   G.money += d.money; G.stageMoney += d.money;
   G.score += d.money * mult * (G.dai > 0 ? 2 : 1);
-  G.energy = Math.min(100, G.energy + d.energy);
-  G.v += d.boost; // 吸うたびに加速
+  G.v += d.boost * (1 + Math.min(G.combo, 40) * 0.015); // 吸うたびに加速（連続ほど強く）
+  G.thrust = Math.min(2.5, G.thrust + d.boost * 0.35 + 0.15);
+  G.fovKick += Math.min(1.2, d.boost * 0.9);
+  // 台座の下から金色の噴射
+  for (let k = 0; k < 5 + d.boost * 3 && parts.length < MAXP; k++) parts.push({ x: G.bx + (Math.random() - 0.5) * 0.6 * S, y: G.by - 0.8 * S, z: (Math.random() - 0.5) * 0.5, vx: (Math.random() - 0.5) * 1.5, vy: -5 - Math.random() * 6 - d.boost, vz: 0, life: 0.7, max: 0.7, r: 1, g: 0.85, b: 0.45, grav: 0 });
   if (G.fever) { G.feverCount++; if (G.feverCount === HENSHIN_NEED && G.dai <= 0) henshin(); }
   if (c.type === 'koban') {
     audio.koban(); G.fovKick += 4; G.shake = Math.max(G.shake, 0.15);
@@ -578,7 +615,7 @@ let resultKind = 'clear';
 function stageClear() {
   state = 'result'; resultKind = 'clear';
   input.down = input.key = false;
-  const bonus = Math.round(G.energy) * 10 + (G.dai > 0 ? 3000 : 0);
+  const bonus = Math.round(Math.max(0, G.v)) * 30 + (G.dai > 0 ? 3000 : 0);
   G.score += bonus;
   const last = G.stage + 1 >= STAGES.length;
   saveBest();
@@ -589,7 +626,7 @@ function stageClear() {
   $('resRibbon').textContent = G.dai > 0 ? '大仏変身ボーナス +3,000' : `第${G.stage + 1}天「${STAGES[G.stage].name}」踏破`;
   $('resLines').innerHTML = [
     `このステージの賽銭 <b>¥${G.stageMoney.toLocaleString()}</b>`,
-    `残り法力ボーナス <b>+${(Math.round(G.energy) * 10).toLocaleString()}</b>`,
+    `勢いボーナス <b>+${(Math.round(Math.max(0, G.v)) * 30).toLocaleString()}</b>`,
     `仏像：<b>Lv.${form().lv} ${form().name}</b>`,
     `スコア <b>${G.score.toLocaleString()}</b>`,
     last ? `黄金の大仏は極楽浄土へ到達した<br>称号：<b>${rank(G.score)}</b>` : `次は「<b>${STAGES[G.stage + 1].name}</b>」へ`,
@@ -634,11 +671,11 @@ function updateHUD() {
   $('goalFill').style.width = Math.min(100, (altM() - st.start) / st.goal * 100) + '%';
   const nxt = FORMS[G.form + 1];
   $('evoFill').style.width = nxt ? Math.min(100, (G.money - form().need) / (nxt.need - form().need) * 100) + '%' : '100%';
-  $('energyFill').style.width = G.energy + '%';
-  $('energyFill').classList.toggle('low', G.energy < 25);
-  $('speedFill').style.width = Math.min(100, Math.max(0, G.v) / 60 * 100) + '%';
+  $('energyFill').style.width = THREE.MathUtils.clamp(G.v / maxSpeed() * 100, 0, 100) + '%';
+  $('energyFill').classList.toggle('low', G.v < 5);
   let s = '';
-  if (G.fever && G.dai <= 0) s = `賽銭の嵐 ${Math.min(G.feverCount, HENSHIN_NEED)} / ${HENSHIN_NEED} 枚`;
+  if (G.v < 0) s = '落下中！ 長押しで吸い上げろ！';
+  else if (G.fever && G.dai <= 0) s = `賽銭の嵐 ${Math.min(G.feverCount, HENSHIN_NEED)} / ${HENSHIN_NEED} 枚`;
   else if (G.gori > 0) s = `御利益 ${G.gori.toFixed(1)}秒`;
   else if (G.combo >= 5) s = `${G.combo} 連続`;
   setText('status', s);
@@ -672,28 +709,29 @@ function frameVisuals(dt, t) {
     buddhaRoot.rotation.set(0, Math.sin(titleT * 0.3) * 0.25, 0);
     const a = titleT * 0.12;
     camera.fov = 50; camera.updateProjectionMatrix();
-    camera.position.set(Math.sin(a) * 9, by + 2.2, 15 + Math.cos(a) * 2);
-    lookAt.set(0, by + 3.4, 0); camera.lookAt(lookAt);
-    // 渦を巻いて吸い込まれる硬貨
-    if (titleCoins.length < 40 && Math.random() < 0.5) {
-      const types = ['zeni', 'zeni', 'zeni', 'koban', 'goriyaku'];
+    camera.position.set(Math.sin(a) * 9, by + 1.6, 15 + Math.cos(a) * 2);
+    lookAt.set(0, by + 2.2, 0); camera.lookAt(lookAt);
+    // 賽銭鉢から渦を巻いて吸い上げられる硬貨
+    if (titleCoins.length < 46 && Math.random() < 0.45) {
+      const types = ['zeni', 'zeni', 'zeni', 'koban', 'zeni', 'goriyaku'];
       const o = makeCoinMesh(types[Math.random() * types.length | 0]); scene.add(o);
-      titleCoins.push({ o, a: Math.random() * 6.28, r: 6 + Math.random() * 4, y: by + Math.random() * 7 - 1, s: Math.random() * 6 });
+      titleCoins.push({ o, a: Math.random() * 6.28, r: 1.5 + Math.random() * 1.2, y: -0.6, s: Math.random() * 6, vy: 2 + Math.random() * 1.5 });
     }
     for (let i = titleCoins.length - 1; i >= 0; i--) {
       const c = titleCoins[i];
-      c.a += dt * (1.5 + 4 / c.r); c.r -= dt * 1.6; c.s += dt * 6;
-      const my = by + 1.85 * S;
-      c.y += (my - c.y) * dt * 0.8;
-      c.o.position.set(Math.cos(c.a) * c.r, c.y, Math.sin(c.a) * c.r * 0.6 + 0.4);
-      c.o.userData.mesh.rotation.set(0.3, c.s, 0);
-      c.o.scale.setScalar(Math.min(1, c.r / 2));
-      if (c.r < 0.4) { scene.remove(c.o); titleCoins.splice(i, 1); emit(0, my, 0.4, 0xffd070, 3, 1.2, 0.5); }
+      const target = by - 0.4;
+      c.a += dt * 3.2; c.y += c.vy * dt; c.s += dt * 7;
+      const u = THREE.MathUtils.clamp((c.y + 0.6) / (target + 0.6), 0, 1);
+      const rr = c.r * (1 - u * 0.85);
+      c.o.position.set(Math.cos(c.a) * rr, c.y, Math.sin(c.a) * rr * 0.7 + 0.3);
+      c.o.userData.mesh.rotation.set(0.4, c.s, 0);
+      c.o.scale.setScalar(1 - u * 0.5);
+      if (c.y > target) { scene.remove(c.o); titleCoins.splice(i, 1); emit(0, target + 0.3, 0.3, 0xffd070, 3, 1.2, 0.5); }
     }
     model.userData.mouth.scale.y = 0.04;
     world.update(0, camera.position, t);
     for (const L of lineData) L.k = 0; lineMat.opacity = 0;
-    swirl.visible = false;
+    swirl.visible = false; jet.material.opacity = 0;
     updatePillars(t, by + 10, 0);
     updateMotesFor(by);
     aura.material.opacity = 0.18;
@@ -706,7 +744,10 @@ function frameVisuals(dt, t) {
   buddhaRoot.position.set(bx, by + bob, 0);
   const curS = buddhaRoot.scale.x;
   buddhaRoot.scale.setScalar(curS + (S - curS) * Math.min(1, dt * 3));
-  buddhaRoot.rotation.set(-speed01 * 0.12, THREE.MathUtils.clamp(-G.bvx * 0.02, -0.3, 0.3), THREE.MathUtils.clamp(-G.bvx * 0.015, -0.2, 0.2));
+  // 左右に動くと進む方向へ向きを変え、少し傾く（止まると正面に戻る）
+  const yawTarget = THREE.MathUtils.clamp(G.bvx * 0.11, -1.1, 1.1);
+  G.yaw = (G.yaw || 0) + (yawTarget - (G.yaw || 0)) * Math.min(1, dt * 6);
+  buddhaRoot.rotation.set(-speed01 * 0.12 - G.thrust * 0.04, G.yaw, -G.yaw * 0.22);
   const ud = model.userData;
   ud.mouth.scale.set(0.06 + G.mouth * 0.03, 0.006 + G.mouth * 0.07, 0.02 + G.mouth * 0.02);
   ud.lipL.position.y = -0.29 - G.mouth * 0.04;
@@ -718,21 +759,34 @@ function frameVisuals(dt, t) {
   // 点滅（無敵時間）
   model.visible = !(G.inv > 0 && Math.floor(t / 70) % 2);
 
-  // 吸引の渦
-  swirl.visible = !!G.sucking;
-  if (G.sucking) {
-    const R = Math.min(suckR(), 12);
-    swirl.position.copy(mouthW);
-    swirlDisc.scale.setScalar(R);
+  // 吸い上げの渦
+  swirl.visible = !!G.sucking && !!G.suck;
+  if (swirl.visible) {
+    const k = G.suck, top = by + 0.4 * S, bottom = k.cy - k.ry * 0.95;
+    const h = Math.max(1, top - bottom);
+    swirl.position.set(bx, top, 0);
+    const boost = G.gori > 0 || G.dai > 0 ? 1.4 : 1;
+    vortex.scale.set(k.rx * 0.95, h, k.rx * 0.6); vortex2.scale.set(k.rx * 0.7, h, k.rx * 0.45);
+    vortexTex.offset.set(-t * 0.0012, -t * 0.0016);
+    vortexMat.opacity = 0.42 * boost; vortex2.material.opacity = 0.25 * boost;
+    vortex2.rotation.y = -t * 0.003;
     swirlRings.forEach((r, i) => {
-      const k = 1 - ((t * 0.0011 + i / swirlRings.length) % 1);
-      r.scale.setScalar(R * k); r.material.opacity = (1 - k) * 0.45 * (G.gori > 0 ? 1.4 : 1);
-      r.rotation.z = t * 0.002;
+      const u = (t * 0.0007 + i / swirlRings.length) % 1; // 下から上へ昇って細くなる
+      r.position.y = -h * (1 - u);
+      const rad = k.rx * (0.18 + 0.82 * (1 - u));
+      r.scale.set(rad, rad, 1); r.material.opacity = Math.sin(u * Math.PI) * 0.6 * boost;
     });
+    if (Math.random() < 0.6) { // 渦を昇る光の粒
+      const a2 = Math.random() * 6.28, yy = top - Math.random() * h, rr = k.rx * (0.2 + 0.8 * (top - yy) / h);
+      parts.length < MAXP && parts.push({ x: bx + Math.cos(a2) * rr, y: yy, z: Math.sin(a2) * rr * 0.6, vx: -Math.sin(a2) * 2, vy: 3 + Math.random() * 2, vz: Math.cos(a2) * 1.2, life: 0.6, max: 0.6, r: 1, g: 0.88, b: 0.55, grav: 0 });
+    }
   }
+  // 加速の噴射
+  jet.material.opacity = Math.min(1, G.thrust * 0.6 + speed01 * 0.25);
+  jet.scale.set(1.2 + G.thrust * 0.5, 1.5 + G.thrust * 3 + speed01 * 2, 1);
 
   // カメラ（速度で視野が広がる＝ドリーズーム）
-  const fov = 52 + speed01 * 24 + Math.min(20, G.fovKick);
+  const fov = 52 + speed01 * 24 + Math.min(20, G.fovKick) + G.thrust * 2.5;
   camera.fov += (fov - camera.fov) * Math.min(1, dt * 5);
   const tanH = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
   viewDist = Math.max(VIEW_H / 2 / tanH, VIEW_W / 2 / (tanH * camera.aspect));
@@ -751,13 +805,13 @@ function frameVisuals(dt, t) {
   updatePillars(t, camY, speed01);
 
   // スピード線
-  lineMat.opacity = Math.max(0, speed01 * 0.75 - 0.05);
-  const lineSpeed = (Math.max(0, G.v) / UNIT_M) * 3.2;
+  lineMat.opacity = Math.min(0.85, Math.max(0, speed01 * 0.75 - 0.05) + G.thrust * 0.18);
+  const lineSpeed = (Math.max(0, G.v) / UNIT_M) * (3.2 + G.thrust * 1.5);
   for (let i = 0; i < LINES; i++) {
     const L = lineData[i];
     L.y -= lineSpeed * L.k * dt;
     if (L.y < camY - viewHalfH * 1.6) resetLine(L, camY, viewHalfH * 1.4, false);
-    const len = 0.6 + speed01 * 7 * L.k;
+    const len = 0.6 + (speed01 * 7 + G.thrust * 2) * L.k;
     p4.set(L.x, L.y, L.z); s4.set(1 + speed01, len, 1); q4.identity();
     m4.compose(p4, q4, s4); lines.setMatrixAt(i, m4);
   }
@@ -781,7 +835,7 @@ function frameVisuals(dt, t) {
 
 function updatePillars(t, cy, speed01) {
   const alt = G ? altM() : 0;
-  const strength = alt > 2300 ? 0.6 : alt < 300 ? 0.45 : 0.2;
+  const strength = alt > 3450 ? 0.6 : alt < 450 ? 0.45 : 0.2;
   for (const p of pillars) {
     p.position.set(p.userData.ox, cy + 25, p.userData.oz);
     p.lookAt(camera.position.x, p.position.y, camera.position.z);
@@ -796,7 +850,7 @@ function updateMotesFor(cy) {
   }
   mGeo.attributes.position.needsUpdate = true;
   const alt = G ? altM() : 0;
-  motes.material.color.set(alt < 400 || alt > 2300 ? 0xffc8dc : alt > 1500 && alt < 2300 ? 0xd8e0ff : 0xfff4d0);
+  motes.material.color.set(alt < 600 || alt > 3450 ? 0xffc8dc : alt > 2250 && alt < 3450 ? 0xd8e0ff : 0xfff4d0);
 }
 
 // ---------- ループ ----------
@@ -825,4 +879,4 @@ function loop(now) {
 requestAnimationFrame(loop);
 
 // 動作確認用
-window.__buddha = { get state() { return state; }, get G() { return G; }, input, setModel, world, camera, scene, renderer, composer };
+window.__buddha = { get state() { return state; }, get G() { return G; }, input, setModel, world, camera, scene, renderer, composer, step(n, dt = 1 / 60) { for (let i = 0; i < n && state === 'play'; i++) update(dt); } };
