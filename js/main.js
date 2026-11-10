@@ -4,9 +4,9 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { buildBuddha, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611101738';
-import { World, UNIT_M, makeLightPillars } from './world.js?v=202611101738';
-import { AudioEngine } from './audio.js?v=202611101738';
+import { buildBuddha, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611101800';
+import { World, UNIT_M, makeLightPillars } from './world.js?v=202611101800';
+import { AudioEngine } from './audio.js?v=202611101800';
 
 const $ = (id) => document.getElementById(id);
 const store = {
@@ -258,7 +258,7 @@ window.addEventListener('keydown', (e) => {
   const k = e.key;
   if (k === 'ArrowLeft' || k === 'a' || k === 'A') input.left = true;
   if (k === 'ArrowRight' || k === 'd' || k === 'D') input.right = true;
-  if (k === ' ' || k === 'z' || k === 'Z') { e.preventDefault(); audio.init(); if (state === 'play') input.key = true; }
+  if (k === ' ') { e.preventDefault(); audio.init(); }
   if (k === 'Enter' && !e.repeat) { audio.init(); if (state === 'title' && audio.ready) startGame(); else if (state === 'result') $('resNext').click(); }
   if ((k === 'p' || k === 'P' || k === 'Escape') && !e.repeat) togglePause();
   if ((k === 'm' || k === 'M') && !e.repeat) toggleSound();
@@ -267,7 +267,6 @@ window.addEventListener('keyup', (e) => {
   const k = e.key;
   if (k === 'ArrowLeft' || k === 'a' || k === 'A') input.left = false;
   if (k === 'ArrowRight' || k === 'd' || k === 'D') input.right = false;
-  if (k === ' ' || k === 'z' || k === 'Z') input.key = false;
 });
 window.addEventListener('blur', () => { input.down = input.key = input.left = input.right = false; if (state === 'play') togglePause(); });
 
@@ -315,7 +314,7 @@ function startGame() {
   G = newGameState();
   setModel(1);
   resetMotes(G.camY);
-  show('title', false); show('hud', true); show('panel', true);
+  show('title', false); show('hud', true);
   beginStage(0);
 }
 function beginStage(i) {
@@ -329,9 +328,9 @@ function beginStage(i) {
   banner(`第${i + 1}天`, STAGES[i].name);
   audio.gong();
 }
-function nextStage() { show('hud', true); show('panel', true); beginStage(G.stage + 1); }
+function nextStage() { show('hud', true); beginStage(G.stage + 1); }
 function toTitle() {
-  show('result', false); show('pause', false); show('hud', false); show('panel', false); show('title', true);
+  show('result', false); show('pause', false); show('hud', false); show('title', true);
   clearWorldObjects();
   G = null; state = 'title';
   refreshBest();
@@ -481,7 +480,7 @@ function update(dt) {
   G.bx = THREE.MathUtils.clamp(G.bx, -XB, XB);
 
   // 吸引（押している間だけ・呪縛中は不可）
-  const sucking = (input.down || input.key || G.dai > 0) && G.curse <= 0;
+  const sucking = G.curse <= 0; // 吸い込みは常に自動（呪縛中だけ止まる）
   G.sucking = sucking;
   G.mouth += ((sucking ? 1 : 0) - G.mouth) * Math.min(1, dt * 12);
 
@@ -715,7 +714,7 @@ function stageClear() {
   ].join('<br>');
   $('resNext').textContent = last ? 'もう一度遊ぶ' : '次へ';
   if (last) { resultKind = 'end'; setModel(5); G.dai = 1; }
-  show('result', true); show('hud', false); show('panel', false);
+  show('result', true); show('hud', false);
 }
 function gameOver(reason = '') {
   state = 'result'; resultKind = 'over';
@@ -728,7 +727,7 @@ function gameOver(reason = '') {
   $('resRibbon').textContent = `称号：${rank(G.score)}`;
   $('resLines').innerHTML = [reason || `第${G.stage + 1}天「${STAGES[G.stage].name}」で力尽きた`, `スコア <b>${G.score.toLocaleString()}</b>　最大 <b>${G.maxCombo}</b> 連続`, `ベストスコア <b>${best.score.toLocaleString()}</b>`].join('<br>');
   $('resNext').textContent = 'もう一度遊ぶ';
-  show('result', true); show('hud', false); show('panel', false);
+  show('result', true); show('hud', false);
 }
 function rank(s) {
   if (s >= 90000) return '如来'; if (s >= 50000) return '菩薩'; if (s >= 25000) return '明王';
@@ -753,9 +752,6 @@ function updateHUD() {
   setText('goalLbl', `▲ ${Math.max(0, Math.ceil(st.start + st.goal - altM())).toLocaleString()}m`);
   const s = '';
   setText('status', s);
-  const sb = $('suckBtn');
-  sb.classList.toggle('on', !!G.sucking); sb.classList.toggle('cursed', G.curse > 0);
-  setText('suckLbl', G.curse > 0 ? '呪縛' : G.sucking ? '吸引中' : '吸う');
 }
 
 // ---------- 描画まわりの更新 ----------

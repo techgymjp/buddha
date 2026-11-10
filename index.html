@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Old+Mincho:wght@700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=202611101738">
+<link rel="stylesheet" href="style.css?v=202611101800">
 <script type="importmap">
 { "imports": { "three": "./vendor/three.module.min.js", "three/addons/": "./vendor/addons/" } }
 </script>
@@ -41,10 +41,6 @@
   <button id="pauseBtn" type="button" aria-label="一時停止">Ⅱ</button>
 </div>
 
-<!-- 下部：タップ操作 -->
-<div id="panel" class="hidden">
-  <div class="suck" id="suckBtn"><span id="suckLbl">吸う</span></div>
-</div>
 
 <div id="floaters"></div>
 <div id="banner"></div>
@@ -70,7 +66,8 @@
   <div class="card">
     <h2 class="gold">遊び方</h2>
     <ul class="rules">
-      <li><b>長押し</b>で吸引、<b>離すと停止</b>。押したまま<b>左右スワイプ</b>で移動</li>
+      <li>操作は<b>左右の移動だけ</b>（スワイプ／PCは ← →）。硬貨は<b>自動で吸い込む</b></li>
+      <li>上に連なる<b>硬貨の道をたどって</b>吸い込むほど加速して昇る</li>
       <li>お金を吸うたびに<b>加速</b>。連続で吸うほど加速が強くなる</li>
       <li>吸わないと重力で減速し、<b>勢い</b>が尽きると落下…画面の下まで落ちたら終わり</li>
       <li><b>カラスに当たったら即アウト！</b>（御利益中・大仏変身中は追い払える）</li>
@@ -79,7 +76,7 @@
       <div><i class="lg zeni"></i><b>銅銭</b>（天保通寳）<br>¥10・少し加速</div>
       <div><i class="lg koban"></i><b>小判</b><br>¥300・大きく加速</div>
       <div><i class="lg gori"></i><b>黄金の御利益コイン</b><br>吸引範囲アップ・呪い無効・超加速</div>
-      <div><i class="lg noroi"></i><b>呪いの銭</b>（寛永通寳）<br>吸うと失速＆しばらく吸えない</div>
+      <div><i class="lg noroi"></i><b>呪いの銭</b>（寛永通寳）<br>吸い込むと失速＆しばらく吸えない。左右に動いてよけよう</div>
     </div>
     <p class="evo-line">木造仏 → 黒漆の仏像 → 光背の巨大化 → 千手観音 → 黄金の大仏</p>
     <p class="evo-line">ステージ終盤の<b>賽銭の嵐</b>で14枚吸い込むと<b>巨大な大仏</b>に変身！</p>
@@ -111,6 +108,6 @@
 <div id="nogl" class="screen hidden"><div class="card"><h2 class="gold">WebGLが使えません</h2><p>このゲームは3D表示（WebGL）に対応したブラウザで遊べます。</p></div></div>
 
 </div>
-<script type="module" src="js/main.js?v=202611101738"></script>
+<script type="module" src="js/main.js?v=202611101800"></script>
 </body>
 </html>
