@@ -67,6 +67,17 @@ function thump(ctx, dest, t, k = 1) {
   const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.35 * k, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
   o.connect(g).connect(dest); o.start(t); o.stop(t + 0.4);
 }
+// カラスの鳴き声「カァッ」：しゃがれたのこぎり波を声の共鳴（フォルマント）に通す
+function caw(ctx, dest, t, k = 1) {
+  const o = ctx.createOscillator(); o.type = 'sawtooth';
+  o.frequency.setValueAtTime(760 * k, t); o.frequency.exponentialRampToValueAtTime(540 * k, t + 0.3);
+  const f1 = ctx.createBiquadFilter(); f1.type = 'bandpass'; f1.frequency.value = 1250; f1.Q.value = 3;
+  const f2 = ctx.createBiquadFilter(); f2.type = 'bandpass'; f2.frequency.value = 2500; f2.Q.value = 4;
+  const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.7, t + 0.025); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.34);
+  o.connect(f1).connect(g); o.connect(f2).connect(g); g.connect(dest);
+  o.start(t); o.stop(t + 0.36);
+  noise(ctx, dest, t, 0.3, 1600, 1100, 0.12); // しゃがれ
+}
 async function offline(dur, fn) {
   const C = window.OfflineAudioContext || window.webkitOfflineAudioContext;
   const oc = new C(1, Math.ceil(SR * dur), SR);
@@ -213,6 +224,8 @@ export class AudioEngine {
       henshin: [2.0, (c, d) => { [262, 330, 392, 523, 659, 784, 1047].forEach((f, i) => tone(c, d, 0.2 + i * 0.09, f, 0.6, 'triangle', 0.07)); noise(c, d, 0.005, 1.5, 200, 2500, 0.4); }],
       stomp: [0.7, (c, d) => { thump(c, d, 0.005, 1.2); tone(c, d, 0.005, 300, 0.25, 'square', 0.08, 900); noise(c, d, 0.02, 0.4, 300, 3000, 0.25); metal(c, d, 0.06, 2093, 0.18, 0.5); }],
       beat: [0.6, (c, d) => { thump(c, d, 0.005, 1.1); thump(c, d, 0.2, 0.8); }],
+      crowHit: [1.2, (c, d) => { caw(c, d, 0.005, 1.05); caw(c, d, 0.36, 0.95); thump(c, d, 0.005, 1.4); noise(c, d, 0.005, 0.25, 2500, 400, 0.45); tone(c, d, 0.005, 180, 0.4, 'square', 0.08, -120); }],
+      fall: [1.3, (c, d) => { tone(c, d, 0.005, 900, 1.1, 'sine', 0.18, -760); noise(c, d, 0.005, 1.2, 1800, 150, 0.25); }],
       over: [1.5, (c, d) => { tone(c, d, 0.005, 220, 0.6, 'triangle', 0.1, -120); tone(c, d, 0.3, 165, 1.0, 'triangle', 0.1, -80); }],
     };
     for (const [k, [dur, fn]] of Object.entries(fx)) tasks.push(async () => { this.buf[k] = await offline(dur, fn); });
@@ -340,6 +353,8 @@ export class AudioEngine {
   gong() { this.play('gong', 0.35); }
   henshin() { this.play('gong', 0.35); this.play('henshin'); }
   over() { this.play('over'); }
+  crowHit() { this.play('crowHit'); }
+  fall() { this.play('fall'); }
   stomp() { this.play('stomp'); }
   beat(k = 1) { this.play('beat', 0.5 + k * 0.6); }
   boost() { /* 小判・御利益の音に含めた */ }

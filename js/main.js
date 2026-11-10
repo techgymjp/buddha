@@ -4,9 +4,9 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { buildBuddha, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611101918';
-import { World, UNIT_M, makeLightPillars } from './world.js?v=202611101918';
-import { AudioEngine } from './audio.js?v=202611101918';
+import { buildBuddha, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611101924';
+import { World, UNIT_M, makeLightPillars } from './world.js?v=202611101924';
+import { AudioEngine } from './audio.js?v=202611101924';
 
 const $ = (id) => document.getElementById(id);
 const store = {
@@ -582,7 +582,7 @@ function update(dt) {
   else G.camY = Math.max(camTarget, G.camY - PHYS.camDown * dt);
   // 地面に落ちる、または画面の下まで落ちたらアウト
   G.danger = THREE.MathUtils.clamp(1 - (G.by - (G.camY - viewHalfH)) / 5, 0, 1);
-  if (G.by < G.camY - viewHalfH + 0.6 || (G.by < 0.2 && G.v < 0)) { gameOver(); return; }
+  if (G.by < G.camY - viewHalfH + 0.6 || (G.by < 0.2 && G.v < 0)) { startDeath('fall'); return; }
 
   // 硬貨の道を先まで敷く
   extendPath(G.camY + viewHalfH + 12);
@@ -667,10 +667,8 @@ function update(dt) {
           shockwave(G.bx, G.by - 0.5 * S, 0xfff0c0, 4);
           continue;
         }
-        // 横や上からぶつかったら即アウト
-        audio.hit(); flash(0.5); G.shake = 1;
-        emit(f.x, f.y, 0, 0x222228, 30, 6, 1);
-        gameOver('カラスに当たった！'); return;
+        // 横や下からぶつかったら即アウト（激突の演出のあと結果へ）
+        startDeath('crow', f); return;
       }
       if (f.y < G.camY - viewHalfH - 3) { scene.remove(f.obj); G.foes.splice(i, 1); continue; } // 通り過ぎたカラスは片付ける
     } else {
@@ -772,6 +770,40 @@ function henshin() {
 }
 
 let resultKind = 'over';
+// ---------- やられ演出 ----------
+function startDeath(kind, crow) {
+  state = 'dying';
+  G.death = { t: 0, kind, crow };
+  G.spin = 0;
+  if (kind === 'crow') {
+    audio.crowHit(); flash(0.6); G.shake = 1.4; G.danger = 1;
+    emit(crow.x, crow.y, 0.3, 0x18181e, 40, 7, 1.4, 5);        // 黒い羽根が飛び散る
+    emit(crow.x, crow.y, 0.3, 0xffffff, 16, 9, 0.35);          // 衝撃の火花
+    shockwave(crow.x, crow.y, 0xff6050, 5);
+    G.v = -4; G.bvx = (G.bx - crow.x) * 6;                      // 弾き飛ばされる
+    crow.vx = Math.sign(crow.vx || 1) * 9; crow.flee = true;    // カラスは鳴きながら飛び去る
+  } else {
+    audio.fall(); G.danger = 1;
+  }
+}
+function updateDying(dt) {
+  const D = G.death; D.t += dt;
+  const slow = D.kind === 'crow' && D.t < 0.55 ? 0.25 : 1;     // 激突の瞬間はスローモーション
+  const sdt = dt * slow;
+  G.v = Math.max(-35, G.v - PHYS.g * sdt);
+  G.by += (G.v / UNIT_M) * sdt;
+  G.bx += G.bvx * sdt; G.bvx *= Math.pow(0.3, sdt);
+  G.spin += sdt * (D.kind === 'crow' ? 9 : 4);                  // くるくる回って落ちる
+  G.shake *= Math.pow(0.2, dt);
+  G.danger = Math.max(0, 1 - D.t * 0.8);
+  const f = D.crow;
+  if (f && f.obj) {
+    f.t += sdt; f.x += f.vx * sdt; f.y += 4 * sdt;
+    f.obj.position.set(f.x, f.y, 0.3); f.obj.rotation.y = f.vx > 0 ? 0 : Math.PI;
+    const flap = Math.sin(f.t * 22) * 1.0; f.obj.userData.wings[0].rotation.x = -flap; f.obj.userData.wings[1].rotation.x = flap;
+  }
+  if (D.t > (D.kind === 'crow' ? 1.7 : 1.1)) gameOver(D.kind === 'crow' ? 'カラスに当たった！' : '');
+}
 function gameOver(reason = '') {
   state = 'result'; resultKind = 'over';
   input.down = input.key = false;
@@ -880,6 +912,7 @@ function frameVisuals(dt, t) {
   const yawTarget = THREE.MathUtils.clamp(G.bvx * 0.11, -1.1, 1.1);
   G.yaw = (G.yaw || 0) + (yawTarget - (G.yaw || 0)) * Math.min(1, dt * 6);
   buddhaRoot.rotation.set(-speed01 * 0.12 - G.thrust * 0.04, G.yaw, -G.yaw * 0.22);
+  if (state === 'dying') buddhaRoot.rotation.set(G.spin * 0.35, G.yaw, G.spin); // やられ：回転しながら落ちる
   const ud = model.userData;
   ud.mouth.scale.set(0.06 + G.mouth * 0.03, 0.006 + G.mouth * 0.07, 0.02 + G.mouth * 0.02);
   ud.lipL.position.y = -0.29 - G.mouth * 0.04;
@@ -923,7 +956,7 @@ function frameVisuals(dt, t) {
   }
 
   // カメラ（速度で視野が広がる＝ドリーズーム）
-  const fov = 52 + speed01 * 24 + Math.min(20, G.fovKick) + G.thrust * 2.5;
+  const fov = state === 'dying' && G.death.kind === 'crow' && G.death.t < 0.8 ? 40 : 52 + speed01 * 24 + Math.min(20, G.fovKick) + G.thrust * 2.5;
   camera.fov += (fov - camera.fov) * Math.min(1, dt * 5);
   const tanH = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
   viewDist = Math.max(VIEW_H / 2 / tanH, VIEW_W / 2 / (tanH * camera.aspect));
@@ -1011,6 +1044,7 @@ function loop(now) {
   last = now;
   adaptQuality(Math.min(0.2, rawDt));
   if (G && state === 'play') { update(dt); }
+  if (G && state === 'dying') updateDying(dt);
   if (G && state === 'play') updateHUD();
   if (G && state === 'result') { // 結果画面では仏像の周りをゆっくり回る
     const a = now * 0.0003;
