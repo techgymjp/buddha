@@ -16,22 +16,22 @@ const store = {
 
 // ---------- 定数 ----------
 const STAGES = [
-  { name: '地上の寺院', goal: 900, curse: 0.07, foeRate: 0.2, foes: ['crow'], grav: 2.6 },
-  { name: '山頂',       goal: 750, curse: 0.11, foeRate: 0.3, foes: ['crow', 'crow', 'thunder'], grav: 3.1 },
-  { name: '雲海',       goal: 900, curse: 0.15, foeRate: 0.38, foes: ['thunder', 'crow'], grav: 3.6 },
-  { name: '天空',       goal: 1050, curse: 0.19, foeRate: 0.42, foes: ['thunder'], grav: 4.1 },
-  { name: '極楽浄土',   goal: 1200, curse: 0.22, foeRate: 0, foes: [], grav: 4.6 },
+  { name: '地上の寺院', goal: 1800, curse: 0.07, foeRate: 0.2, foes: ['crow'], grav: 2.3 },
+  { name: '山頂',       goal: 1500, curse: 0.11, foeRate: 0.3, foes: ['crow', 'crow', 'thunder'], grav: 3.1 },
+  { name: '雲海',       goal: 1800, curse: 0.15, foeRate: 0.38, foes: ['thunder', 'crow'], grav: 3.6 },
+  { name: '天空',       goal: 2100, curse: 0.19, foeRate: 0.42, foes: ['thunder'], grav: 4.1 },
+  { name: '極楽浄土',   goal: 2400, curse: 0.22, foeRate: 0, foes: [], grav: 4.6 },
 ];
 let acc = 0; STAGES.forEach((s) => { s.start = acc; acc += s.goal; });
 const FORMS = [
   { lv: 1, name: '木造仏', need: 0, scale: 0.95 },
-  { lv: 2, name: '黒漆の仏像', need: 1700, scale: 1.0 },
-  { lv: 3, name: '光背の仏像', need: 6200, scale: 1.05 },
-  { lv: 4, name: '千手観音', need: 13600, scale: 1.1 },
-  { lv: 5, name: '黄金の大仏', need: 23500, scale: 1.35 },
+  { lv: 2, name: '黒漆の仏像', need: 5000, scale: 1.0 },
+  { lv: 3, name: '光背の仏像', need: 16000, scale: 1.05 },
+  { lv: 4, name: '千手観音', need: 30000, scale: 1.1 },
+  { lv: 5, name: '黄金の大仏', need: 50000, scale: 1.35 },
 ];
 const COINS = {
-  zeni: { money: 10, r: 0.46, boost: 5, w: 70 },
+  zeni: { money: 10, r: 0.46, boost: 5.5, w: 70 },
   koban: { money: 300, r: 0.6, boost: 6, w: 9 },
   goriyaku: { money: 500, r: 0.45, boost: 12, w: 2.2 },
   noroi: { money: 0, r: 0.38, boost: -5, w: 0 },
@@ -330,18 +330,20 @@ function addCoin(type, x, y, z = 0) {
   G.coins.push({ type, obj, x, y, z, vx: 0, vy: 0, spin: Math.random() * 6, ph: Math.random() * 6, pulled: false });
 }
 function newSegment(P) {
-  const st = STAGES[G.stage];
   if (G.fever) { P.mode = 'storm'; P.left = 999; return; }
   const r = Math.random();
-  P.cx = THREE.MathUtils.clamp(P.x, -XB + 1.5, XB - 1.5);
+  // 区間が変わるたびに道が左右に大きく移る
+  if (Math.random() < 0.5) P.x = (P.x > 0 ? -1 : 1) * (2.5 + Math.random() * 2.8);
+  P.cx = THREE.MathUtils.clamp(P.x, -2, 2);
   P.ph = 0;
-  if (r < 0.26) { P.mode = 'wave'; P.left = 14 + (Math.random() * 10 | 0); P.amp = 1.2 + Math.random() * 2.2; P.freq = 0.22 + Math.random() * 0.18; }
-  else if (r < 0.42) { P.mode = 'line'; P.left = 8 + (Math.random() * 8 | 0); P.slope = (Math.random() - 0.5) * 0.9; }
-  else if (r < 0.56) { P.mode = 'helix'; P.left = 12 + (Math.random() * 8 | 0); }
-  else if (r < 0.7) { P.mode = 'zigzag'; P.left = 14 + (Math.random() * 8 | 0); P.tx = P.x > 0 ? -3.5 : 3.5; }
-  else if (r < 0.84) { P.mode = 'branch'; P.left = 10 + (Math.random() * 5 | 0); P.good = Math.random() < 0.5 ? -1 : 1; }
-  else if (r < 0.92 && G.time > 4) { P.mode = 'gap'; P.left = 1 + (Math.random() * 2 | 0) + (G.stage >> 1); }
-  else { P.mode = 'line'; P.left = 6; P.slope = 0; }
+  if (r < 0.24) { P.mode = 'wave'; P.left = 10 + (Math.random() * 8 | 0); P.amp = 3 + Math.random() * 2; P.freq = 0.3 + Math.random() * 0.15; }
+  else if (r < 0.36) { P.mode = 'line'; P.left = 6 + (Math.random() * 6 | 0); P.slope = (Math.random() < 0.5 ? -1 : 1) * (0.6 + Math.random() * 0.6); }
+  else if (r < 0.48) { P.mode = 'helix'; P.left = 8 + (Math.random() * 6 | 0); }
+  else if (r < 0.64) { P.mode = 'zigzag'; P.left = 10 + (Math.random() * 8 | 0); P.tx = P.x > 0 ? -4.6 : 4.6; }
+  else if (r < 0.78) { P.mode = 'scatter'; P.left = 8 + (Math.random() * 6 | 0); }
+  else if (r < 0.9) { P.mode = 'branch'; P.left = 8 + (Math.random() * 5 | 0); P.good = Math.random() < 0.5 ? -1 : 1; P.cx = 0; P.x = 0; }
+  else if (G.time > 4) { P.mode = 'gap'; P.left = 1 + (Math.random() * 2 | 0) + (G.stage >> 1); }
+  else { P.mode = 'wave'; P.left = 8; P.amp = 3.5; P.freq = 0.35; }
 }
 function extendPath(limitY) {
   const st = STAGES[G.stage];
@@ -354,9 +356,10 @@ function extendPath(limitY) {
     switch (P.mode) {
       case 'wave': P.x = P.cx + Math.sin(P.ph * P.freq * 2) * P.amp; break;
       case 'line': P.x += P.slope * STEP; if (Math.abs(P.x) > XB - 0.6) P.slope *= -1; break;
-      case 'helix': P.x = P.cx + Math.sin(P.ph * 0.55) * 1.2; z = Math.cos(P.ph * 0.55) * 1.2; break;
-      case 'zigzag': P.x += Math.sign(P.tx - P.x) * Math.min(0.6, Math.abs(P.tx - P.x)); if (Math.abs(P.tx - P.x) < 0.1) P.tx = -P.tx; break;
-      case 'storm': P.x = Math.sin(P.ph * 0.2) * 2.2; break;
+      case 'helix': P.x = P.cx + Math.sin(P.ph * 0.7) * 3.2; z = Math.cos(P.ph * 0.7) * 1.2; break;
+      case 'zigzag': P.x += Math.sign(P.tx - P.x) * Math.min(1.5, Math.abs(P.tx - P.x)); if (Math.abs(P.tx - P.x) < 0.1) P.tx = -P.tx; break;
+      case 'scatter': P.x += (P.x > 0 ? -1 : 1) * (1.5 + Math.random() * 2.5); break; // 左右に振られた硬貨を取りに行く
+      case 'storm': P.x = Math.sin(P.ph * 0.35) * 3.2; break;
     }
     P.x = THREE.MathUtils.clamp(P.x, -XB + 0.4, XB - 0.4);
     if (P.mode === 'gap') continue;
@@ -365,7 +368,7 @@ function extendPath(limitY) {
       continue;
     }
     if (P.mode === 'branch') { // 分かれ道：片方は小判、もう片方は呪いの銭まじり
-      const spread = Math.min(2.6, (P.left < 3 ? P.left : 3) * 0.9);
+      const spread = Math.min(3.8, (P.left < 3 ? P.left : 3) * 1.3);
       for (const side of [-1, 1]) {
         const good = side === P.good;
         const x = P.x + side * spread;
@@ -499,7 +502,7 @@ function update(dt) {
   mouthW.set(G.bx, G.by + 2.7 * S, -0.2);           // 吸い込み口は頭上
   const tx = G.bx, ty = G.by + 2.7 * S;
   const cx = G.bx, cy = ty + R * 0.75;          // 吸引範囲は仏像の上に伸びる
-  const rx = R * 0.85, ry = R * 1.4;
+  const rx = Math.min(R * 0.5, 2.6) + (G.dai > 0 ? 6 : 0), ry = R * 1.4; // 横幅は細く：左右に動いて狙う
   G.suck = { cx, cy, rx, ry, tx, ty };
   const bvy = G.v / UNIT_M;
   const damp = Math.pow(0.02, dt);
@@ -546,7 +549,7 @@ function update(dt) {
       const flap = Math.sin(f.t * 16) * 0.9;
       f.obj.userData.wings[0].rotation.x = -flap; f.obj.userData.wings[1].rotation.x = flap;
       if (Math.hypot(G.bx - f.x, G.by + 1.0 * S - f.y) < 0.9 * S + f.r) {
-        if (G.dai > 0 || G.gori > 0) { G.score += 200; emit(f.x, f.y, 0, 0xfff0c0, 24, 6); floatText(f.x, f.y, 0, 'カラス退散 +200', '#fff3a0', 18); scene.remove(f.obj); G.foes.splice(i, 1); continue; }
+        if (G.dai > 0 || G.gori > 0) { G.score += 200; emit(f.x, f.y, 0, 0xfff0c0, 24, 6); scene.remove(f.obj); G.foes.splice(i, 1); continue; }
         if (G.inv <= 0) {
           const stolen = Math.min(G.money, 30 + G.stage * 30);
           G.money -= stolen;
@@ -584,7 +587,7 @@ function absorb(c) {
   const d = COINS[c.type];
   const S = bScale();
   if (c.type === 'noroi') {
-    if (G.gori > 0 || G.dai > 0) { G.score += 150; emit(c.x, c.y, 0, 0xe0c0ff, 14, 4); floatText(c.x, c.y, 0, '呪い浄化 +150', '#f0d8ff', 18); audio.coin(12); return; }
+    if (G.gori > 0 || G.dai > 0) { G.score += 150; emit(c.x, c.y, 0, 0xe0c0ff, 14, 4); audio.coin(12); return; }
     const lost = Math.min(G.money, Math.floor(G.money * 0.06) + 30);
     G.money -= lost;
     G.v += d.boost; // 失速
@@ -619,7 +622,7 @@ function absorb(c) {
     inhaleRing(8, 0xfff2b0); setTimeout(() => G && inhaleRing(5, 0xfff2b0), 150);
   } else {
     audio.coin(Math.min(25, G.combo));
-    if (G.combo % 15 === 0) { floatText(G.bx, G.by + 4.2, 0, `${G.combo} 連続吸引！ ×${mult}`, '#ffffff', 22); G.fovKick += 2; }
+    if (G.combo % 15 === 0) G.fovKick += 2;
   }
   // 成長
   let nf = G.form;
@@ -862,7 +865,7 @@ function frameVisuals(dt, t) {
 
 function updatePillars(t, cy, speed01) {
   const alt = G ? altM() : 0;
-  const strength = alt > 3450 ? 0.6 : alt < 450 ? 0.45 : 0.2;
+  const strength = alt > 6900 ? 0.6 : alt < 900 ? 0.45 : 0.2;
   for (const p of pillars) {
     p.position.set(p.userData.ox, cy + 25, p.userData.oz);
     p.lookAt(camera.position.x, p.position.y, camera.position.z);
@@ -877,7 +880,7 @@ function updateMotesFor(cy) {
   }
   mGeo.attributes.position.needsUpdate = true;
   const alt = G ? altM() : 0;
-  motes.material.color.set(alt < 600 || alt > 3450 ? 0xffc8dc : alt > 2250 && alt < 3450 ? 0xd8e0ff : 0xfff4d0);
+  motes.material.color.set(alt < 1200 || alt > 6900 ? 0xffc8dc : alt > 4500 && alt < 6900 ? 0xd8e0ff : 0xfff4d0);
 }
 
 // ---------- ループ ----------

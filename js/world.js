@@ -7,14 +7,14 @@ export const UNIT_M = 6; // 1ユニット = 6m
 // ---------- 高度ごとの空と光（キーフレーム） ----------
 const K = [
   { m: 0,    top: 0x3a76c4, hor: 0xcfe5f5, bot: 0x7d8f74, fog: 0xc2d8e8, near: 60, far: 420, sun: 0xfff0d6, sunI: 2.6, sky: 0xd6ecff, gnd: 0x6a5838, hemiI: 1.1, stars: 0, elev: 0.55 },
-  { m: 600,  top: 0x2c66b6, hor: 0xd9ecf8, bot: 0x9fb0a8, fog: 0xcfe2ef, near: 80, far: 520, sun: 0xfff2dc, sunI: 2.6, sky: 0xd6ecff, gnd: 0x7a6a50, hemiI: 1.1, stars: 0, elev: 0.5 },
-  { m: 1350,  top: 0x2457a6, hor: 0xeef6fc, bot: 0xf4f8fb, fog: 0xe7f0f7, near: 70, far: 520, sun: 0xfff4e2, sunI: 2.8, sky: 0xe8f4ff, gnd: 0xd0d8e0, hemiI: 1.2, stars: 0, elev: 0.45 },
-  { m: 2250, top: 0x1d3f8c, hor: 0xffd0a0, bot: 0xffe3c8, fog: 0xf2d4bb, near: 70, far: 520, sun: 0xffc488, sunI: 2.6, sky: 0xffe0c0, gnd: 0xc08060, hemiI: 1.0, stars: 0, elev: 0.14 },
-  { m: 2850, top: 0x0b1440, hor: 0xe2825c, bot: 0x2c1c3c, fog: 0x6a4a68, near: 60, far: 600, sun: 0xff9a60, sunI: 1.8, sky: 0x8a6aa0, gnd: 0x302040, hemiI: 0.8, stars: 0.6, elev: 0.04 },
-  { m: 3300, top: 0x02030c, hor: 0x1a2a64, bot: 0x050818, fog: 0x101832, near: 80, far: 700, sun: 0xc8d6ff, sunI: 1.3, sky: 0x4050a0, gnd: 0x101020, hemiI: 0.7, stars: 1, elev: 0.3 },
-  { m: 3570, top: 0x2b1a44, hor: 0xffaa6a, bot: 0x6a3a40, fog: 0xc08a70, near: 60, far: 600, sun: 0xffd4a0, sunI: 2.2, sky: 0xffc0a0, gnd: 0x804050, hemiI: 0.9, stars: 0.35, elev: 0.2 },
-  { m: 3825, top: 0xf0a2c6, hor: 0xffe6ae, bot: 0xfff0dc, fog: 0xffdcc8, near: 80, far: 900, sun: 0xfff0d0, sunI: 3.0, sky: 0xffe8f0, gnd: 0xffd0a0, hemiI: 1.3, stars: 0, elev: 0.6 },
-  { m: 4800, top: 0xf8c2dc, hor: 0xfff4d4, bot: 0xffffff, fog: 0xffefe0, near: 90, far: 1100, sun: 0xfff6e0, sunI: 3.2, sky: 0xfff0f4, gnd: 0xffe0b0, hemiI: 1.4, stars: 0, elev: 0.7 },
+  { m: 1200,  top: 0x2c66b6, hor: 0xd9ecf8, bot: 0x9fb0a8, fog: 0xcfe2ef, near: 80, far: 520, sun: 0xfff2dc, sunI: 2.6, sky: 0xd6ecff, gnd: 0x7a6a50, hemiI: 1.1, stars: 0, elev: 0.5 },
+  { m: 2700,  top: 0x2457a6, hor: 0xeef6fc, bot: 0xf4f8fb, fog: 0xe7f0f7, near: 70, far: 520, sun: 0xfff4e2, sunI: 2.8, sky: 0xe8f4ff, gnd: 0xd0d8e0, hemiI: 1.2, stars: 0, elev: 0.45 },
+  { m: 4500, top: 0x1d3f8c, hor: 0xffd0a0, bot: 0xffe3c8, fog: 0xf2d4bb, near: 70, far: 520, sun: 0xffc488, sunI: 2.6, sky: 0xffe0c0, gnd: 0xc08060, hemiI: 1.0, stars: 0, elev: 0.14 },
+  { m: 5700, top: 0x0b1440, hor: 0xe2825c, bot: 0x2c1c3c, fog: 0x6a4a68, near: 60, far: 600, sun: 0xff9a60, sunI: 1.8, sky: 0x8a6aa0, gnd: 0x302040, hemiI: 0.8, stars: 0.6, elev: 0.04 },
+  { m: 6600, top: 0x02030c, hor: 0x1a2a64, bot: 0x050818, fog: 0x101832, near: 80, far: 700, sun: 0xc8d6ff, sunI: 1.3, sky: 0x4050a0, gnd: 0x101020, hemiI: 0.7, stars: 1, elev: 0.3 },
+  { m: 7140, top: 0x2b1a44, hor: 0xffaa6a, bot: 0x6a3a40, fog: 0xc08a70, near: 60, far: 600, sun: 0xffd4a0, sunI: 2.2, sky: 0xffc0a0, gnd: 0x804050, hemiI: 0.9, stars: 0.35, elev: 0.2 },
+  { m: 7650, top: 0xf0a2c6, hor: 0xffe6ae, bot: 0xfff0dc, fog: 0xffdcc8, near: 80, far: 900, sun: 0xfff0d0, sunI: 3.0, sky: 0xffe8f0, gnd: 0xffd0a0, hemiI: 1.3, stars: 0, elev: 0.6 },
+  { m: 9600, top: 0xf8c2dc, hor: 0xfff4d4, bot: 0xffffff, fog: 0xffefe0, near: 90, far: 1100, sun: 0xfff6e0, sunI: 3.2, sky: 0xfff0f4, gnd: 0xffe0b0, hemiI: 1.4, stars: 0, elev: 0.7 },
 ];
 const tmpA = new THREE.Color(), tmpB = new THREE.Color();
 function lerpC(a, b, t, out) { tmpA.setHex(a); tmpB.setHex(b); return out.copy(tmpA).lerp(tmpB, t); }
@@ -354,31 +354,36 @@ export class World {
       m.position.set(x, H / 2 - 4, z);
       this.scene.add(m);
     };
-    [[-170, -300, 150, 215, 1], [210, -360, 180, 245, 2], [-30, -480, 230, 235, 3], [120, -200, 90, 160, 4], [-280, -220, 120, 175, 5], [340, -220, 120, 165, 6], [78, -150, 62, 190, 7], [-90, -150, 70, 140, 8]].forEach((a) => mk(...a));
+    [[-190, -340, 210, 430, 1], [230, -400, 250, 490, 2], [-30, -560, 320, 470, 3], [130, -240, 130, 320, 4], [-300, -260, 170, 350, 5], [360, -260, 170, 330, 6], [-190, -330, 110, 280, 8]].forEach((a) => mk(...a));
   }
 
   // 清水の舞台風の懸造り
   buildKiyomizu() {
     const g = new THREE.Group(); g.position.set(62, 0, -112); this.scene.add(g);
     const wood = new THREE.MeshStandardMaterial({ color: 0x5a4030, roughness: 0.9 });
-    const top = 188;
+    const top = 376;
     // 舞台の背後にそびえる山（舞台はこの斜面に張り出して建つ）
-    const H = 240, R = 110, apexY = top + 14, apexZ = -14;
+    // 上は舞台が張り出す急な山頂、下は地上まで続く岩の柱（ふもとが手前の境内まで広がらないように）
+    const apexY = top + 14, apexZ = -14, H = 120, R = 55;
     const slopeY = (x, z) => apexY - (H / R) * Math.hypot(x, z - apexZ); // 斜面の高さ
-    const geo = new THREE.ConeGeometry(R, H, 72, 24, true);
-    const pos = geo.attributes.position, col = [], c = new THREE.Color();
-    for (let i = 0; i < pos.count; i++) {
-      const vx = pos.getX(i), vy = pos.getY(i), vz = pos.getZ(i);
-      const hr = (vy + H / 2) / H, ang = Math.atan2(vz, vx);
-      const n = Math.sin(ang * 7 + 1) * 0.03 + Math.sin(ang * 17) * 0.015;
-      pos.setXYZ(i, vx * (1 + n), vy, vz * (1 + n));
-      if (hr > 0.55 && Math.random() < 0.35) c.setHex(0x6e6a5e); else c.setHex(0x2d4a2b).lerp(new THREE.Color(0x46623a), Math.random() * 0.6);
-      col.push(c.r, c.g, c.b);
-    }
-    geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-    geo.computeVertexNormals();
-    const mount = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, flatShading: true }));
-    mount.position.set(0, apexY - H / 2, apexZ); g.add(mount);
+    const paint = (geo, rocky) => {
+      const pos = geo.attributes.position, col = [], c = new THREE.Color();
+      for (let i = 0; i < pos.count; i++) {
+        const vx = pos.getX(i), vz = pos.getZ(i), ang = Math.atan2(vz, vx);
+        const n = Math.sin(ang * 7 + 1) * 0.03 + Math.sin(ang * 17) * 0.015;
+        pos.setX(i, vx * (1 + n)); pos.setZ(i, vz * (1 + n));
+        if (Math.random() < rocky) c.setHex(0x6e6a5e).lerp(new THREE.Color(0x8a867a), Math.random() * 0.4); else c.setHex(0x2d4a2b).lerp(new THREE.Color(0x46623a), Math.random() * 0.6);
+        col.push(c.r, c.g, c.b);
+      }
+      geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+      geo.computeVertexNormals();
+      return new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, flatShading: true }));
+    };
+    const peak = paint(new THREE.ConeGeometry(R, H, 64, 16, true), 0.25);
+    peak.position.set(0, apexY - H / 2, apexZ); g.add(peak);
+    const trunkH = apexY - H + 20;
+    const trunk = paint(new THREE.CylinderGeometry(R, 85, trunkH, 64, 12, true), 0.55);
+    trunk.position.set(0, apexY - H - trunkH / 2 + 0.5, apexZ); g.add(trunk);
     // 懸造り：柱は斜面まで届く
     const pg = new THREE.CylinderGeometry(0.45, 0.5, 1, 8);
     for (let i = 0; i < 7; i++) for (let j = 0; j < 5; j++) {
@@ -402,7 +407,7 @@ export class World {
     const cg = new THREE.ConeGeometry(2.2, 10, 7);
     for (let i = 0; i < 70; i++) {
       const ang = -Math.PI * 0.95 + Math.random() * Math.PI * 0.9 + Math.PI; // 手前側の斜面
-      const r = 22 + Math.random() * 70;
+      const r = 20 + Math.random() * 33;
       const x = Math.cos(ang) * r, z = apexZ - Math.sin(ang) * r;
       if (Math.abs(x) < 16 && z > -6 && z < 24) continue; // 舞台の下は空ける
       const t = new THREE.Mesh(cg, cedarMat); t.position.set(x, slopeY(x, z) + 4, z); t.scale.setScalar(0.8 + Math.random() * 0.8); g.add(t);
@@ -432,32 +437,32 @@ export class World {
     };
     // 各高度の雲
     for (let i = 0; i < 170; i++) {
-      const y = 12 + Math.random() * 540;
+      const y = 12 + Math.random() * 1090;
       const near = Math.random() < 0.12;
       const z = near ? 4 + Math.random() * 8 : -70 - Math.random() * 300;
       const x = near ? (Math.random() < 0.5 ? -1 : 1) * (7 + Math.random() * 10) : (Math.random() - 0.5) * 500;
-      const mats = y > 540 ? pink : y > 380 && y < 470 ? [gold] : white;
+      const mats = y > 1080 ? pink : y > 760 && y < 940 ? [gold] : white;
       const sp = add(mats, x, y, z, near ? 10 + Math.random() * 10 : 40 + Math.random() * 90);
       if (near) { sp.material = sp.material.clone(); sp.material.opacity = 0.4; this.passClouds.push(sp); }
     }
     // 山頂の下に広がる雲海
     for (let i = 0; i < 90; i++) {
       const a = Math.random() * Math.PI * 2, r = 120 + Math.random() * 380;
-      add(white, Math.cos(a) * r, 146 + Math.random() * 8, -Math.abs(Math.sin(a) * r * 0.8) - 80, 50 + Math.random() * 70);
+      add(white, Math.cos(a) * r, 292 + Math.random() * 10, -Math.abs(Math.sin(a) * r * 0.8) - 80, 50 + Math.random() * 70);
     }
     const seaTex = this.cloudTexture(['rgba(255,255,255,1)', 'rgba(235,240,248,.9)']);
     seaTex.wrapS = seaTex.wrapT = THREE.RepeatWrapping; seaTex.repeat.set(6, 6);
     const sea = new THREE.Mesh(new THREE.PlaneGeometry(2400, 2400), new THREE.MeshBasicMaterial({ map: seaTex, color: 0xf4f7fb, transparent: true, opacity: 0.95, depthWrite: false }));
-    sea.rotation.x = -Math.PI / 2; sea.position.set(0, 150, -300); this.scene.add(sea);
+    sea.rotation.x = -Math.PI / 2; sea.position.set(0, 300, -300); this.scene.add(sea);
     // 雲海ステージ：入道雲の塔
     for (let t = 0; t < 14; t++) {
       const x = (Math.random() - 0.5) * 300, z = -80 - Math.random() * 220;
-      for (let k = 0; k < 12; k++) add(white, x + (Math.random() - 0.5) * 30, 230 + k * 10 + Math.random() * 8, z + (Math.random() - 0.5) * 20, 50 + Math.random() * 40);
+      for (let k = 0; k < 12; k++) add(white, x + (Math.random() - 0.5) * 30, 460 + k * 20 + Math.random() * 12, z + (Math.random() - 0.5) * 20, 50 + Math.random() * 40);
     }
     // 極楽浄土の雲の床
     for (let i = 0; i < 180; i++) {
       const a = Math.random() * Math.PI * 2, r = 60 + Math.random() * 460;
-      add(Math.random() < 0.6 ? pink : [gold], Math.cos(a) * r, 540 + Math.random() * 30 + (Math.random() < 0.3 ? Math.random() * 150 : 0), Math.sin(a) * r * 0.7 - 200, 50 + Math.random() * 90);
+      add(Math.random() < 0.6 ? pink : [gold], Math.cos(a) * r, 1080 + Math.random() * 40 + (Math.random() < 0.3 ? Math.random() * 300 : 0), Math.sin(a) * r * 0.7 - 200, 50 + Math.random() * 90);
     }
   }
 
@@ -466,11 +471,11 @@ export class World {
     const g = new THREE.Group(); this.scene.add(g);
     // 雲間に浮かぶ巨大な黄金の仏
     const giant = buildBuddha(5);
-    giant.scale.setScalar(70); giant.position.set(0, 520, -520);
+    giant.scale.setScalar(80); giant.position.set(0, 1060, -560);
     giant.traverse((o) => { if (o.material && o.material.fog !== undefined) { /* 霧で薄れすぎないように */ } });
     g.add(giant); this.giant = giant;
     // 宮殿
-    const palaceY = 600;
+    const palaceY = 1200;
     for (const [x, z, s] of [[0, -160, 1.4], [-70, -200, 1], [75, -210, 1], [-140, -260, 0.8], [150, -270, 0.8]]) {
       const h = this.makeHall(30, 18, 9, 0xd0a040, 2); h.position.set(x, palaceY, z); h.scale.setScalar(s);
       h.traverse((o) => { if (o.isMesh && o.material === this.roofMat) o.material = MAT.goldWarm; });
@@ -478,7 +483,7 @@ export class World {
     }
     // 黄金の大階段
     const stair = new THREE.MeshStandardMaterial({ color: 0xf0d090, metalness: 0.6, roughness: 0.35 });
-    for (let i = 0; i < 30; i++) { const s = new THREE.Mesh(new THREE.BoxGeometry(30 - i * 0.3, 0.8, 2), stair); s.position.set(0, 570 + i * 1.0, -100 - i * 2); g.add(s); }
+    for (let i = 0; i < 30; i++) { const s = new THREE.Mesh(new THREE.BoxGeometry(30 - i * 0.3, 0.8, 2), stair); s.position.set(0, 1170 + i * 1.0, -100 - i * 2); g.add(s); }
     // 浮かぶ蓮の花
     const petal = new THREE.SphereGeometry(1, 12, 8);
     for (let i = 0; i < 40; i++) {
@@ -492,7 +497,7 @@ export class World {
       const core = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.4, 0.4, 16), new THREE.MeshStandardMaterial({ color: 0xffe080, emissive: 0xffc040, emissiveIntensity: 0.8 })); core.position.y = 0.6; f.add(core);
       const pad = new THREE.Mesh(new THREE.CircleGeometry(2.4, 24), new THREE.MeshStandardMaterial({ color: 0x4a8a50, roughness: 0.7, side: THREE.DoubleSide })); pad.rotation.x = -Math.PI / 2; f.add(pad);
       const side = Math.random() < 0.5 ? -1 : 1;
-      f.position.set(side * (10 + Math.random() * 60), 560 + Math.random() * 190, -10 - Math.random() * 120);
+      f.position.set(side * (10 + Math.random() * 60), 1120 + Math.random() * 400, -10 - Math.random() * 120);
       f.scale.setScalar(1 + Math.random() * 2.5);
       f.rotation.x = 0.3;
       g.add(f);
