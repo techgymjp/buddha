@@ -4,9 +4,9 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { buildBuddha, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611101830';
-import { World, UNIT_M, makeLightPillars } from './world.js?v=202611101830';
-import { AudioEngine } from './audio.js?v=202611101830';
+import { buildBuddha, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611101835';
+import { World, UNIT_M, makeLightPillars } from './world.js?v=202611101835';
+import { AudioEngine } from './audio.js?v=202611101835';
 
 const $ = (id) => document.getElementById(id);
 const store = {
@@ -370,7 +370,25 @@ function newSegment(P) {
   else if (G.time > 4) { P.mode = 'gap'; P.left = 1 + (Math.random() * 2 | 0) + (G.stage >> 1); }
   else { P.mode = 'wave'; P.left = 8; P.amp = 1; P.freq = 0.4; }
 }
+// カラスは実際の高度に配置し、その高度で左右を行き来する（仏像についてこない）
+const CROW_GAP = [14, 12, 11, 10, 15]; // カラスどうしの高さの間隔（ユニット）
+function placeCrows(limitY) {
+  if (G.nextCrowY == null) G.nextCrowY = G.by + 9;
+  while (G.nextCrowY < limitY) {
+    const y = G.nextCrowY;
+    G.nextCrowY += CROW_GAP[G.stage] * (0.75 + Math.random() * 0.6);
+    if (G.fever || !STAGES[G.stage].foes.includes('crow')) continue;
+    const dir = Math.random() < 0.5 ? 1 : -1;
+    const obj = makeCrow(); obj.scale.setScalar(1.3); scene.add(obj);
+    // 行き来するのは画面の一部だけ（必ずどこかに通り抜けられる隙間がある）
+    const cx = (Math.random() < 0.5 ? -1 : 1) * (1 + Math.random() * 3), range = 1.5 + Math.random() * 1.5;
+    const x = cx + (Math.random() - 0.5) * range;
+    obj.position.set(x, y, 0.3); obj.rotation.y = dir > 0 ? 0 : Math.PI;
+    G.foes.push({ kind: 'crow', obj, x, y, cx, range, vx: dir * (1.2 + Math.random() * 1.4 + G.stage * 0.2), vy: 0, bob: 0.3 + Math.random() * 0.4, t: Math.random() * 6, r: 0.5 });
+  }
+}
 function extendPath(limitY) {
+  placeCrows(limitY);
   const st = STAGES[G.stage];
   if (!G.path) G.path = { x: LANE, y: G.by + 2.4, mode: 'wave', left: 8, amp: 0.8, freq: 0.4, ph: 0, cx: LANE, side: 1, n: 0 };
   const P = G.path;
@@ -411,7 +429,9 @@ function extendPath(limitY) {
 function spawnFoe(cy, halfH) {
   const st = STAGES[G.stage];
   if (!st.foes.length) return;
-  const kind = st.foes[Math.random() * st.foes.length | 0];
+  const clouds = st.foes.filter((k) => k !== 'crow');
+  if (!clouds.length) return;
+  const kind = clouds[Math.random() * clouds.length | 0];
   if (kind === 'crow') {
     // 仏像より下を横切るカラス（上から落ちて踏みつけると撃ち落としてジャンプ）
     const crows = G.foes.filter((f) => f.kind === 'crow' && !f.dead);
@@ -589,6 +609,8 @@ function update(dt) {
         continue;
       }
       f.x += f.vx * dt; f.y += (f.vy + Math.sin(f.t * 3) * (f.bob || 0.6)) * dt;
+      const lim = f.range != null ? f.range : XB + 0.6, base = f.cx || 0;
+      if (Math.abs(f.x - base) > lim) { f.x = base + Math.sign(f.x - base) * lim; f.vx = -f.vx; f.obj.rotation.y = f.vx > 0 ? 0 : Math.PI; } // 決まった範囲で折り返す
       f.obj.position.set(f.x, f.y, 0.3);
       const flap = Math.sin(f.t * 16) * 0.9;
       f.obj.userData.wings[0].rotation.x = -flap; f.obj.userData.wings[1].rotation.x = flap;
@@ -611,8 +633,7 @@ function update(dt) {
         emit(f.x, f.y, 0, 0x222228, 30, 6, 1);
         gameOver('カラスに当たった！'); return;
       }
-      if (f.y > G.camY + viewHalfH + 6 || f.y < G.camY - viewHalfH - 3) { scene.remove(f.obj); G.foes.splice(i, 1); continue; }
-      if (Math.abs(f.x) > 16) { scene.remove(f.obj); G.foes.splice(i, 1); continue; }
+      if (f.y < G.camY - viewHalfH - 3) { scene.remove(f.obj); G.foes.splice(i, 1); continue; } // 通り過ぎたカラスは片付ける
     } else {
       f.x += f.vx * dt; if (Math.abs(f.x) > XB) f.vx *= -1;
       f.obj.position.x = f.x;
