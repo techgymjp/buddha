@@ -16,9 +16,8 @@ const DICT = {
     howTitle: '遊び方',
     howRules: [
       '<i>↔</i><span><b>左右に動かす</b></span>',
-      '<i>⤓</i><span><b>下スワイプで急降下</b></span>',
       '<i>🪙</i><span><b>硬貨を吸って昇る</b></span>',
-      '<i>🐦</i><span><b>カラスを踏むと大ジャンプ</b>（連続でさらに高く）</span>',
+      '<i>🐦</i><span>落ちてもカラスを<b>踏めば大ジャンプ</b>（3連続で大仏に）</span>',
       '<i>⬇</i><span><b>下に落ちたらアウト</b></span>',
     ],
     lgZeni: '<b>銅銭</b>　↑',
@@ -60,9 +59,8 @@ const DICT = {
     howTitle: 'How to play',
     howRules: [
       '<i>↔</i><span><b>Move left / right</b></span>',
-      '<i>⤓</i><span><b>Swipe down to dive</b></span>',
       '<i>🪙</i><span><b>Suck up coins to climb</b></span>',
-      '<i>🐦</i><span><b>Stomp crows to bounce</b> (chain for more)</span>',
+      '<i>🐦</i><span>Falling? <b>Stomp a crow to bounce</b> (3 in a row = giant Buddha)</span>',
       '<i>⬇</i><span><b>Fall off the bottom = out</b></span>',
     ],
     lgZeni: '<b>Copper coin</b>　↑',

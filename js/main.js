@@ -4,10 +4,10 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { buildBuddha, buildSkin, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611102056';
-import { World, UNIT_M, makeLightPillars } from './world.js?v=202611102056';
-import { t, lang, setLang, applyStatic } from './i18n.js?v=202611102056';
-import { AudioEngine } from './audio.js?v=202611102056';
+import { buildBuddha, buildSkin, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611102103';
+import { World, UNIT_M, makeLightPillars } from './world.js?v=202611102103';
+import { t, lang, setLang, applyStatic } from './i18n.js?v=202611102103';
+import { AudioEngine } from './audio.js?v=202611102103';
 
 const $ = (id) => document.getElementById(id);
 const store = {
@@ -323,20 +323,17 @@ let flashV = 0;
 function flash(v) { flashV = Math.max(flashV, v); }
 
 // ---------- 入力：押すと吸引／離すと停止、押したまま左右スワイプで移動 ----------
-const input = { down: false, lastX: 0, dragPx: 0, left: false, right: false, key: false, dive: false, sy: 0, st: 0, diveUsed: false };
+const input = { down: false, lastX: 0, dragPx: 0, left: false, right: false, key: false };
 const canvas = $('c');
 canvas.addEventListener('pointerdown', (e) => {
   audio.init();
   if (state !== 'play') return;
-  input.down = true; input.lastX = e.clientX; input.sy = e.clientY; input.st = performance.now(); input.diveUsed = false;
+  input.down = true; input.lastX = e.clientX;
   try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
 });
 canvas.addEventListener('pointermove', (e) => {
   if (!input.down) return;
   input.dragPx += e.clientX - input.lastX; input.lastX = e.clientX;
-  // すばやく下にスワイプしたら急降下
-  if (!input.diveUsed && e.clientY - input.sy > 32 && performance.now() - input.st < 350) { input.dive = true; input.diveUsed = true; }
-  if (performance.now() - input.st > 350) { input.sy = e.clientY; input.st = performance.now(); input.diveUsed = false; } // 長いドラッグ中も何度でも
 });
 const release = () => { input.down = false; };
 canvas.addEventListener('pointerup', release); canvas.addEventListener('pointercancel', release);
@@ -344,7 +341,6 @@ canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 window.addEventListener('keydown', (e) => {
   const k = e.key;
   if (k === 'ArrowLeft' || k === 'a' || k === 'A') input.left = true;
-  if ((k === 'ArrowDown' || k === 's' || k === 'S') && !e.repeat) { e.preventDefault(); input.dive = true; }
   if (k === 'ArrowRight' || k === 'd' || k === 'D') input.right = true;
   if (k === ' ') { e.preventDefault(); audio.init(); }
   if (k === 'Enter' && !e.repeat) { audio.init(); if (state === 'title' && audio.ready) startGame(); else if (state === 'result') $('resNext').click(); }
@@ -539,7 +535,7 @@ function newSegment(P) {
   else { P.mode = 'wave'; P.left = 8; P.amp = 1; P.freq = 0.4; }
 }
 // カラスは実際の高度に配置し、その高度で左右を行き来する（仏像についてこない）
-const CROW_GAP = [22, 17, 15, 14, 18]; // カラスどうしの高さの間隔（ユニット）
+const CROW_GAP = [28, 22, 20, 18, 23]; // カラスどうしの高さの間隔（ユニット）
 function placeCrows(limitY) {
   if (G.nextCrowY == null) G.nextCrowY = G.by + 30; // 最初のカラスは十分上から
   while (G.nextCrowY < limitY) {
@@ -716,16 +712,9 @@ function update(dt) {
   G.recT += dt;
   while (G.recT >= 0.1) { G.recT -= 0.1; if (G.rec.length < 12000) G.rec.push(+G.bx.toFixed(2), +G.by.toFixed(2)); }
 
-  // 急降下：下のカラスを踏みに行く（落ちすぎれば画面の下でアウト）
-  if (input.dive) {
-    input.dive = false;
-    if (!(G.diving > 0) && G.v > -30) { G.diving = 0.8; G.v = Math.min(G.v, -34); audio.dive(); vib(15); G.fovKick += 3; G.shake = Math.max(G.shake, 0.15); }
-  }
-  if (G.diving > 0) { G.diving -= dt; G.v = Math.min(G.v, -34); }
-
   // 物理：重力と、硬貨で得る逆重力（上向きの力）、空気抵抗
   let up = 0;
-  if (G.anti > 0) { if (!(G.diving > 0)) up += G.antiA; G.anti -= dt; } // 硬貨を吸った直後の逆重力（急降下中は効かない）
+  if (G.anti > 0) { up += G.antiA; G.anti -= dt; } // 硬貨を吸った直後の逆重力
   if (G.gori > 0) up += 22 * Math.min(1, G.gori / 1.5);     // 御利益コイン：しばらく逆重力が続く
   if (G.dai > 0) up += 32;                                   // 大仏：強い浮力
   if (G.rocket > 0) { up += 80; G.rocket -= Math.max(0, G.v) / UNIT_M * dt; if (G.rocket <= 0) { audio.gong(); flash(0.3); } } // 寄進の力で一気に駆け上がる
@@ -775,7 +764,7 @@ function update(dt) {
   // カメラは仏像の実際の高度を追う：上昇はしっかり追い、落下はゆっくりしか追わない
   const camTarget = G.by + 1.4;
   if (camTarget > G.camY) G.camY += (camTarget - G.camY) * Math.min(1, dt * 6);
-  else G.camY = Math.max(camTarget, G.camY - (G.diving > 0 ? 6 : PHYS.camDown) * dt);
+  else G.camY = Math.max(camTarget, G.camY - PHYS.camDown * dt);
   // 地面に落ちる、または画面の下まで落ちたらアウト
   G.danger = THREE.MathUtils.clamp(1 - (G.by - (G.camY - viewHalfH)) / 5, 0, 1);
   if (G.by < G.camY - viewHalfH + 0.6 || (G.by < 0.2 && G.v < 0)) { startDeath('fall'); return; }
@@ -846,7 +835,7 @@ function update(dt) {
       }
       f.x += f.vx * dt; f.y += Math.sin(f.t * 3) * f.bob * dt; // 一定の高度をまっすぐ横切る
       if (f.patrol) { if (Math.abs(f.x - f.cx) > f.range) { f.x = f.cx + Math.sign(f.x - f.cx) * f.range; f.vx = -f.vx; f.obj.rotation.y = f.vx > 0 ? 0 : Math.PI; } }
-      else if (Math.abs(f.x) > XB + 5) { freeFoe(f); G.foes.splice(i, 1); continue; } // 反対側へ抜けた
+      else if (Math.abs(f.x) > XB + 0.8 && Math.sign(f.x) === Math.sign(f.vx)) { f.vx = -f.vx; f.obj.rotation.y = f.vx > 0 ? 0 : Math.PI; } // 画面の端で折り返し、その高度を行き来し続ける（落ちたときの足場になる）
       f.obj.position.set(f.x, f.y, 0.3);
       const flap = Math.sin(f.t * 16) * 0.9;
       f.obj.userData.wings[0].rotation.x = -flap; f.obj.userData.wings[1].rotation.x = flap;
@@ -859,16 +848,21 @@ function update(dt) {
         emit(G.bx, G.by + 1.2 * S, 0.4, 0xfff6c0, 16, 3, 0.5); vib(15);
       }
       if (cd < hitR) { // 当たり判定は見た目より少し小さく
-        // 仏像の下側で当たった＝上から踏みつけた（下から来るカラスは胸の高さまでなら踏める）
-        const stomp = f.y < G.by + (G.diving > 0 ? 1.1 : 0.45) * S; // 急降下中は踏みやすい
+        // 仏像の下側で当たった＝上から踏みつけた（落ちているときは踏みやすい＝救済）
+        const stomp = f.y < G.by + (G.v < -3 ? 0.95 : 0.45) * S;
         if (G.inv > 0) continue; // お守りが砕けた直後は無敵
         if (stomp || G.dai > 0 || G.rocket > 0) { // 無敵なのは大仏変身中（と寄進の駆け上がり中）だけ
           // 撃ち落として、仏像はジャンプ（3秒以内に続けて踏むと連鎖で跳ねる力が増す）
           f.dead = true; f.vy = -4; f.vx = (f.x - G.bx) * 2 + (Math.random() - 0.5) * 2;
           G.chain = G.time - (G.lastStomp ?? -9) < 3 ? (G.chain || 0) + 1 : 1; G.lastStomp = G.time;
           const ch = Math.min(G.chain, 7);
-          const dive = G.diving > 0; G.diving = 0;
-          G.v = 20 + (ch - 1) * 7 + (dive ? 8 : 0);
+          // 落下の勢いを跳ね返す（速く落ちていたほど高く跳ね、連鎖で倍率がかかる）
+          const impact = Math.max(0, -G.v);
+          G.v = Math.max(22, impact * 1.3 + 14) * (1 + (ch - 1) * 0.25);
+          // カラスが小判をばらまく（吸い込めばお寺へのお金）
+          for (let k = 0; k < 2 + ch; k++) addCoin(k === 0 || Math.random() < 0.6 ? 'koban' : 'zeni', f.x + (Math.random() - 0.5) * 2.4, f.y + 0.6 + Math.random() * 2.5);
+          // 3連鎖で大仏に変身
+          if (ch >= 3 && G.dai <= 0 && !f.golden) henshin();
           G.surge = 1.6; G.fovKick += 5 + ch * 1.5; G.shake = 0.3 + ch * 0.06; G.score += 300 * ch;
           G.combo++; G.comboT = 0.85; G.stomps = (G.stomps || 0) + 1;
           audio.stomp(ch); flash(0.1 + ch * 0.04); vib(25 + ch * 8);
