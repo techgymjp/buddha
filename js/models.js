@@ -209,7 +209,7 @@ function boatHaloGeometry(h, wdt, flames) {
 
 /**
  * 仏像を組み立てる
- * lv: 1木造仏 2黒漆 3光背巨大化 4鎌倉の大仏 5黄金の大仏
+ * lv: 1木造仏 2黒漆 3光背巨大化 4鎌倉の大仏 5黄金の奈良の大仏
  */
 export function buildBuddha(lv) {
   const root = new THREE.Group();
@@ -222,11 +222,11 @@ export function buildBuddha(lv) {
   const ped = new THREE.Group(); body.add(ped);
   const petalMat = lv === 1 ? MAT.wood : lv === 5 ? MAT.goldGreat : lv === 2 ? MAT.gold : lv === 4 ? MAT.stone : MAT.lotus;
   // [枚数, 半径, 高さ, 外への傾き]
-  const tiers = [[18, 0.9, -0.05, 0.55], [18, 0.84, -0.22, 0.95], [14, 0.72, -0.38, 1.25]];
+  const tiers = lv === 5 ? [[16, 1.05, -0.12, 0.6], [16, 0.97, -0.3, 0.9], [16, 0.86, -0.48, 1.2]] : [[18, 0.9, -0.05, 0.55], [18, 0.84, -0.22, 0.95], [14, 0.72, -0.38, 1.25]];
   tiers.forEach(([n, r, y, lean], ti) => {
     for (let i = 0; i < n; i++) {
       const a = (i + ti * 0.5) / n * Math.PI * 2;
-      const p = blob(petalMat, Math.cos(a) * r, y, Math.sin(a) * r, 0.2, 0.34, 0.06, ped);
+      const p = blob(petalMat, Math.cos(a) * r, y, Math.sin(a) * r, lv === 5 ? 0.24 : 0.2, lv === 5 ? 0.42 : 0.34, 0.06, ped);
       p.rotation.order = 'YXZ';
       p.rotation.set(lean, Math.PI / 2 - a, 0);
     }
@@ -271,6 +271,16 @@ export function buildBuddha(lv) {
     capsule(mat, V(0.55, 0.85, 0.25), V(0.06, 1.05, 0.55), 0.1, body);
     blob(mat, -0.03, 1.2, 0.58, 0.05, 0.17, 0.09, body, 0.2);
     blob(mat, 0.03, 1.2, 0.58, 0.05, 0.17, 0.09, body, 0.2);
+  } else if (lv === 5) {
+    // 奈良の大仏：右手は胸の前で手のひらを前に（施無畏印）、左手は膝の上で手のひらを上に（与願印）
+    capsule(mat, V(0.62, 1.3, 0), V(0.78, 0.8, 0.22), 0.13, body);
+    capsule(mat, V(0.78, 0.8, 0.22), V(0.62, 1.28, 0.5), 0.11, body);
+    blob(mat, 0.6, 1.48, 0.52, 0.13, 0.2, 0.05, body);                      // 立てた手のひら
+    for (let f = 0; f < 4; f++) blob(mat, 0.52 + f * 0.055, 1.66 + (f === 1 || f === 2 ? 0.03 : 0), 0.52, 0.026, 0.07, 0.026, body);
+    blob(mat, 0.72, 1.46, 0.53, 0.025, 0.06, 0.025, body, 0, 0, -0.5);       // 親指
+    capsule(mat, V(-0.62, 1.3, 0), V(-0.74, 0.74, 0.18), 0.13, body);
+    capsule(mat, V(-0.74, 0.74, 0.18), V(-0.62, 0.46, 0.52), 0.11, body);
+    blob(mat, -0.6, 0.42, 0.62, 0.14, 0.05, 0.2, body);                      // 膝の上で上に向けた手のひら
   } else {
     capsule(mat, V(-0.62, 1.3, 0), V(-0.68, 0.72, 0.18), 0.13, body);
     capsule(mat, V(0.62, 1.3, 0), V(0.68, 0.72, 0.18), 0.13, body);
@@ -339,7 +349,7 @@ export function buildBuddha(lv) {
     // 頭光：輪＋放射状の光条
     halo.add(new THREE.Mesh(new THREE.TorusGeometry(0.6, 0.04, 8, 64), haloMat));
     halo.add(new THREE.Mesh(new THREE.TorusGeometry(0.66, 0.02, 8, 64), haloMat));
-    if (lv !== 4) {
+    if (lv !== 4 && lv !== 5) {
       const spokes = lv === 2 ? 48 : 72;
       const inner = 0.7, outer = lv === 2 ? 1.75 : lv === 3 ? 2.9 : 2.4;
       const rodGeo = new THREE.CylinderGeometry(0.014, 0.022, 1, 5);
@@ -356,22 +366,31 @@ export function buildBuddha(lv) {
     }
     if (big) {
       // 舟形光背（身光）
-      const boat = new THREE.Mesh(boatHaloGeometry(lv === 4 ? 4.2 : 4.6, lv === 4 ? 1.6 : 1.45, true), mat);
-      boat.position.set(0, -1.0, -0.12); halo.add(boat);
-      const inner = new THREE.Mesh(boatHaloGeometry(3.6, 1.15, false), MAT.goldWarm);
-      inner.position.set(0, -1.05, -0.06); halo.add(inner);
+      const nara = lv === 5;
+      const boat = new THREE.Mesh(boatHaloGeometry(nara ? 6.4 : 4.6, nara ? 2.3 : 1.45, true), mat);
+      boat.position.set(0, nara ? -1.3 : -1.0, -0.12); halo.add(boat);
+      const inner = new THREE.Mesh(boatHaloGeometry(nara ? 5.2 : 3.6, nara ? 1.8 : 1.15, false), MAT.goldWarm);
+      inner.position.set(0, nara ? -1.35 : -1.05, -0.06); halo.add(inner);
     }
-    // 光る曼荼羅の円盤
+    // 光る曼荼羅の円盤（奈良の大仏には付けない）
     const mandala = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: mandalaTexture, color: lv >= 5 ? 0xfff0c0 : 0xffd890, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: lv >= 5 ? 0.55 : 0.4 }));
     const ms = lv >= 5 ? 4.6 : lv === 4 ? 2.2 : 1.5;
-    mandala.scale.set(ms, ms, 1); mandala.position.z = 0.05; halo.add(mandala);
+    mandala.scale.set(ms, ms, 1); mandala.position.z = 0.05; if (lv !== 5) halo.add(mandala);
     halo.userData.mandala = mandala;
     if (lv >= 5) {
-      halo.add(new THREE.Mesh(new THREE.TorusGeometry(2.25, 0.06, 8, 96), mat));
-      for (let i = 0; i < 12; i++) { // 化仏
-        const a = i / 12 * Math.PI * 2;
-        const kb = new THREE.Group(); kb.position.set(Math.cos(a) * 1.95, Math.sin(a) * 1.95, 0.05); halo.add(kb);
-        blob(mat, 0, 0, 0, 0.1, 0.07, 0.07, kb); blob(mat, 0, 0.1, 0, 0.065, 0.08, 0.065, kb); blob(mat, 0, 0.19, 0, 0.045, 0.045, 0.045, kb);
+      // 頭光の円と、舟形光背に並ぶ16体の化仏（奈良の大仏の光背）
+      const disc = new THREE.Mesh(new THREE.CircleGeometry(0.95, 48), MAT.goldWarm); disc.position.z = 0.02; halo.add(disc);
+      halo.add(new THREE.Mesh(new THREE.TorusGeometry(0.95, 0.05, 8, 64), mat));
+      for (let i = 0; i < 16; i++) {
+        const u = (i + 0.5) / 16;                       // 舟形の縁に沿って配置
+        const a = Math.PI * (0.18 + u * 1.64);
+        const x = Math.cos(a + Math.PI / 2) * 1.95 * (0.6 + 0.4 * Math.sin(u * Math.PI));
+        const y = -1.3 + Math.sin(a + Math.PI / 2) * -2.75 + 0.6;
+        const kb = new THREE.Group(); kb.position.set(x, y, 0.08); halo.add(kb);
+        blob(mat, 0, 0, 0, 0.16, 0.08, 0.1, kb);        // 膝
+        blob(mat, 0, 0.13, 0, 0.1, 0.12, 0.08, kb);     // 体
+        blob(mat, 0, 0.29, 0, 0.065, 0.07, 0.065, kb);  // 頭
+        const h = new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.015, 6, 16), mat); h.position.set(0, 0.29, -0.02); kb.add(h);
       }
     }
     glowSize = lv >= 5 ? 7 : lv >= 3 ? 5 : 3.2;

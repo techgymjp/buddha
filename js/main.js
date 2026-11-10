@@ -4,9 +4,9 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { buildBuddha, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611101858';
-import { World, UNIT_M, makeLightPillars } from './world.js?v=202611101858';
-import { AudioEngine } from './audio.js?v=202611101858';
+import { buildBuddha, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611101900';
+import { World, UNIT_M, makeLightPillars } from './world.js?v=202611101900';
+import { AudioEngine } from './audio.js?v=202611101900';
 
 const $ = (id) => document.getElementById(id);
 const store = {
