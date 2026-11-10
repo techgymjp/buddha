@@ -2,16 +2,120 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>空飛ぶ仏像</title>
-<meta name="description" content="仏像が賽銭・小判・硬貨を吸い込み、そのエネルギーで天へ昇っていくブラウザゲーム">
+<meta name="description" content="お金を吸い込め！仏の力で天まで昇れ！ 仏像が賽銭・小判・硬貨を吸い込み、そのエネルギーで天へ昇っていく3Dブラウザゲーム">
+<meta name="theme-color" content="#1a0d04">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Old+Mincho:wght@700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.min.js", "three/addons/": "./vendor/addons/" } }
+</script>
 </head>
 <body>
-<div id="wrap">
-  <canvas id="game" width="540" height="960" aria-label="空飛ぶ仏像 ゲーム画面"></canvas>
-  <button id="mute" type="button" aria-label="サウンド切替">♪</button>
+<canvas id="c" aria-label="空飛ぶ仏像 ゲーム画面"></canvas>
+
+<!-- 上部：スコア・高度 -->
+<div id="hud" class="hidden">
+  <div class="hud-row">
+    <div class="plate left">
+      <div class="lbl">スコア</div>
+      <div class="num gold" id="score">0</div>
+      <div class="sub">👑 ベスト <span id="bestHud">0</span></div>
+    </div>
+    <div class="stage-ribbon"><span id="stageName">第1天 地上の寺院</span></div>
+    <div class="plate right">
+      <div class="lbl">高度</div>
+      <div class="num gold"><span id="alt">0</span><small>m</small></div>
+      <div class="sub">上昇 <b id="speed">0</b> m/s</div>
+    </div>
+  </div>
+  <div class="goal"><div class="goal-fill" id="goalFill"></div><div class="goal-fever"></div><span class="goal-lbl" id="goalLbl">目標 400m</span></div>
+  <div class="hud-row second">
+    <div class="money"><i class="coin-ico"></i><span id="money">0</span></div>
+    <div class="form"><span id="formName">Lv.1 木造仏</span><div class="evo"><div id="evoFill"></div></div></div>
+  </div>
+  <div class="energy"><span>法力</span><div class="bar"><div id="energyFill"></div></div></div>
+  <div class="speedo"><div id="speedFill"></div></div>
+  <div id="status"></div>
+  <button id="pauseBtn" type="button" aria-label="一時停止">Ⅱ</button>
 </div>
-<script src="game.js"></script>
+
+<!-- 下部：タップ操作 -->
+<div id="panel" class="hidden">
+  <div class="suck" id="suckBtn"><span id="suckLbl">吸う</span></div>
+  <div class="howto">
+    <div><b>長押し</b>で吸い込む・<b>離す</b>と止まる</div>
+    <div>押したまま<b>左右にスワイプ</b>で移動</div>
+    <div class="warn">呪いの銭は吸うな！ <span class="pc">PC：Space 吸引 / ←→ 移動</span></div>
+  </div>
+</div>
+
+<div id="floaters"></div>
+<div id="banner"></div>
+<div id="flash"></div>
+
+<!-- タイトル -->
+<section id="title" class="screen">
+  <div class="title-top">
+    <div class="catch">お金を吸い込め！<br>仏の力で天まで昇れ！</div>
+    <h1 class="logo"><span>空飛ぶ</span><span>仏像</span></h1>
+  </div>
+  <div class="title-bottom">
+    <button class="btn gold-btn big" id="startBtn" type="button">スタート</button>
+    <div class="row">
+      <button class="btn round" id="howBtn" type="button">遊び方</button>
+      <button class="btn round" id="soundBtn" type="button">♪ 音</button>
+    </div>
+    <div class="best" id="bestTitle"></div>
+  </div>
+</section>
+
+<section id="how" class="screen hidden">
+  <div class="card">
+    <h2 class="gold">遊び方</h2>
+    <ul class="rules">
+      <li><b>長押し</b>で吸引、<b>離すと停止</b>。押したまま<b>左右スワイプ</b>で移動</li>
+      <li>お金を吸うと<b>法力</b>が回復し、どんどん<b>加速</b>。連続で吸うほど最高速度アップ</li>
+      <li>法力が尽きると落下…画面の下まで落ちたら終わり</li>
+    </ul>
+    <div class="legend">
+      <div><i class="lg zeni"></i><b>銅銭</b>（天保通寳）<br>¥10・少し加速</div>
+      <div><i class="lg koban"></i><b>小判</b><br>¥300・大きく加速</div>
+      <div><i class="lg gori"></i><b>黄金の御利益コイン</b><br>吸引範囲アップ・呪い無効・超加速</div>
+      <div><i class="lg noroi"></i><b>呪いの銭</b>（寛永通寳）<br>吸うと法力減少＆しばらく吸えない</div>
+    </div>
+    <p class="evo-line">木造仏 → 金色の仏像 → 光背の巨大化 → 千手観音 → 黄金の大仏</p>
+    <p class="evo-line">ステージ終盤の<b>賽銭の嵐</b>で25枚吸い込むと<b>巨大な大仏</b>に変身！</p>
+    <button class="btn gold-btn" id="howClose" type="button">閉じる</button>
+  </div>
+</section>
+
+<section id="result" class="screen hidden">
+  <div class="result-title" id="resTitle">ステージクリア！</div>
+  <div class="card">
+    <div class="stat"><div class="lbl">到達高度</div><div class="val" id="resAlt">0m</div></div>
+    <div class="stat"><div class="lbl">獲得した賽銭</div><div class="val"><i class="coin-ico"></i><span id="resMoney">0</span></div></div>
+    <div class="ribbon" id="resRibbon">大仏変身ボーナス！</div>
+    <div class="lines" id="resLines"></div>
+    <button class="btn gold-btn" id="resNext" type="button">次へ</button>
+    <button class="btn blue-btn" id="resTitleBtn" type="button">タイトルに戻る</button>
+  </div>
+</section>
+
+<section id="pause" class="screen hidden">
+  <div class="card">
+    <h2 class="gold">一時停止</h2>
+    <button class="btn gold-btn" id="resumeBtn" type="button">再開</button>
+    <button class="btn round" id="pauseSound" type="button">♪ 音</button>
+    <button class="btn blue-btn" id="quitBtn" type="button">タイトルに戻る</button>
+  </div>
+</section>
+
+<div id="nogl" class="screen hidden"><div class="card"><h2 class="gold">WebGLが使えません</h2><p>このゲームは3D表示（WebGL）に対応したブラウザで遊べます。</p></div></div>
+
+<script type="module" src="js/main.js"></script>
 </body>
 </html>
