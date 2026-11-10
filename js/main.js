@@ -16,27 +16,27 @@ const store = {
 
 // ---------- 定数 ----------
 const STAGES = [
-  { name: '地上の寺院', goal: 900, curse: 0.07, foeRate: 0.2, foes: ['crow'], grav: 3 },
-  { name: '山頂',       goal: 750, curse: 0.11, foeRate: 0.3, foes: ['crow', 'crow', 'thunder'], grav: 3.6 },
-  { name: '雲海',       goal: 900, curse: 0.15, foeRate: 0.38, foes: ['thunder', 'crow'], grav: 4.2 },
-  { name: '天空',       goal: 1050, curse: 0.19, foeRate: 0.42, foes: ['thunder'], grav: 4.8 },
-  { name: '極楽浄土',   goal: 1200, curse: 0.22, foeRate: 0, foes: [], grav: 5.4 },
+  { name: '地上の寺院', goal: 900, curse: 0.07, foeRate: 0.2, foes: ['crow'], grav: 2.6 },
+  { name: '山頂',       goal: 750, curse: 0.11, foeRate: 0.3, foes: ['crow', 'crow', 'thunder'], grav: 3.1 },
+  { name: '雲海',       goal: 900, curse: 0.15, foeRate: 0.38, foes: ['thunder', 'crow'], grav: 3.6 },
+  { name: '天空',       goal: 1050, curse: 0.19, foeRate: 0.42, foes: ['thunder'], grav: 4.1 },
+  { name: '極楽浄土',   goal: 1200, curse: 0.22, foeRate: 0, foes: [], grav: 4.6 },
 ];
 let acc = 0; STAGES.forEach((s) => { s.start = acc; acc += s.goal; });
 const FORMS = [
   { lv: 1, name: '木造仏', need: 0, scale: 0.95 },
-  { lv: 2, name: '黒漆の仏像', need: 2800, scale: 1.0 },
-  { lv: 3, name: '光背の仏像', need: 10000, scale: 1.05 },
-  { lv: 4, name: '千手観音', need: 22000, scale: 1.1 },
-  { lv: 5, name: '黄金の大仏', need: 38000, scale: 1.35 },
+  { lv: 2, name: '黒漆の仏像', need: 1700, scale: 1.0 },
+  { lv: 3, name: '光背の仏像', need: 6200, scale: 1.05 },
+  { lv: 4, name: '千手観音', need: 13600, scale: 1.1 },
+  { lv: 5, name: '黄金の大仏', need: 23500, scale: 1.35 },
 ];
 const COINS = {
-  zeni: { money: 10, r: 0.46, boost: 2.8, w: 70 },
+  zeni: { money: 10, r: 0.46, boost: 5, w: 70 },
   koban: { money: 300, r: 0.6, boost: 6, w: 9 },
   goriyaku: { money: 500, r: 0.45, boost: 12, w: 2.2 },
   noroi: { money: 0, r: 0.38, boost: -5, w: 0 },
 };
-const FEVER_AT = 0.82, HENSHIN_NEED = 20;
+const FEVER_AT = 0.82, HENSHIN_NEED = 14;
 const XB = 5.6;           // 左右の移動範囲
 const VIEW_H = 17.5, VIEW_W = 12;
 
@@ -322,7 +322,7 @@ function clearWorldObjects() {
 }
 
 // ---------- 生成：仏像の上に連なる硬貨の道 ----------
-const STEP = 1.25; // 道の硬貨の間隔（ユニット）：重ならないように離す
+const STEP = 2.0; // 道の硬貨の間隔（ユニット）：1枚ずつはっきり離す
 function addCoin(type, x, y, z = 0) {
   x = THREE.MathUtils.clamp(x, -XB, XB);
   const obj = makeCoinMesh(type);
@@ -340,7 +340,7 @@ function newSegment(P) {
   else if (r < 0.56) { P.mode = 'helix'; P.left = 12 + (Math.random() * 8 | 0); }
   else if (r < 0.7) { P.mode = 'zigzag'; P.left = 14 + (Math.random() * 8 | 0); P.tx = P.x > 0 ? -3.5 : 3.5; }
   else if (r < 0.84) { P.mode = 'branch'; P.left = 10 + (Math.random() * 5 | 0); P.good = Math.random() < 0.5 ? -1 : 1; }
-  else if (r < 0.92 && G.time > 4) { P.mode = 'gap'; P.left = 2 + (Math.random() * 2 | 0) + G.stage; }
+  else if (r < 0.92 && G.time > 4) { P.mode = 'gap'; P.left = 1 + (Math.random() * 2 | 0) + (G.stage >> 1); }
   else { P.mode = 'line'; P.left = 6; P.slope = 0; }
 }
 function extendPath(limitY) {
@@ -361,7 +361,7 @@ function extendPath(limitY) {
     P.x = THREE.MathUtils.clamp(P.x, -XB + 0.4, XB - 0.4);
     if (P.mode === 'gap') continue;
     if (P.mode === 'storm') { // 賽銭の嵐：太い硬貨の帯
-      for (const off of [-1.6, 0, 1.6]) addCoin(Math.random() < 0.14 ? 'koban' : 'zeni', P.x + off, P.y + (Math.random() - 0.5) * 0.3);
+      for (const off of [-2, 0, 2]) addCoin(Math.random() < 0.14 ? 'koban' : 'zeni', P.x + off, P.y + (Math.random() - 0.5) * 0.3);
       continue;
     }
     if (P.mode === 'branch') { // 分かれ道：片方は小判、もう片方は呪いの銭まじり
@@ -375,7 +375,7 @@ function extendPath(limitY) {
       continue;
     }
     let type = 'zeni';
-    if (P.n % 8 === 0) type = 'koban';
+    if (P.n % 6 === 0) type = 'koban';
     else if (Math.random() < 0.008 + G.stage * 0.002) type = 'goriyaku';
     else if (Math.random() < st.curse * 0.18) type = 'noroi'; // 道の上の呪い：一瞬離すか避ける
     addCoin(type, P.x, P.y, z);
