@@ -1,6 +1,6 @@
 // 世界：空、光、雲、寺院、山頂の懸造り、雲海、天空、極楽浄土
 import * as THREE from 'three';
-import { canvasTex, glowTexture, dotTexture, buildBuddha, MAT, mergeStatic } from './models.js?v=202611101804';
+import { canvasTex, glowTexture, dotTexture, buildBuddha, MAT, mergeStatic } from './models.js?v=202611101814';
 
 export const UNIT_M = 6; // 1ユニット = 6m
 

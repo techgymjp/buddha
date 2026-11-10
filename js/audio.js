@@ -144,6 +144,7 @@ export class AudioEngine {
       thunder: [1.0, (c, d) => noise(c, d, 0.005, 0.9, 1200, 80, 0.5)],
       level: [0.8, (c, d) => [523, 659, 784, 1047].forEach((f, i) => tone(c, d, 0.005 + i * 0.08, f, 0.3, 'triangle', 0.09))],
       henshin: [2.0, (c, d) => { [262, 330, 392, 523, 659, 784, 1047].forEach((f, i) => tone(c, d, 0.2 + i * 0.09, f, 0.6, 'triangle', 0.07)); noise(c, d, 0.005, 1.5, 200, 2500, 0.4); }],
+      stomp: [0.7, (c, d) => { thump(c, d, 0.005, 1.2); tone(c, d, 0.005, 300, 0.25, 'square', 0.08, 900); noise(c, d, 0.02, 0.4, 300, 3000, 0.25); metal(c, d, 0.06, 2093, 0.18, 0.5); }],
       beat: [0.6, (c, d) => { thump(c, d, 0.005, 1.1); thump(c, d, 0.2, 0.8); }],
       over: [1.5, (c, d) => { tone(c, d, 0.005, 220, 0.6, 'triangle', 0.1, -120); tone(c, d, 0.3, 165, 1.0, 'triangle', 0.1, -80); }],
     };
@@ -293,6 +294,7 @@ export class AudioEngine {
   gong() { this.play('gong', 0.35); }
   henshin() { this.play('gong', 0.35); this.play('henshin'); }
   over() { this.play('over'); }
+  stomp() { this.play('stomp'); }
   beat(k = 1) { this.play('beat', 0.5 + k * 0.6); }
   boost() { /* 小判・御利益の音に含めた */ }
   thump() { /* 小判・御利益の音に含めた */ }
