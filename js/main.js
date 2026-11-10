@@ -4,9 +4,9 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { buildBuddha, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611101840';
-import { World, UNIT_M, makeLightPillars } from './world.js?v=202611101840';
-import { AudioEngine } from './audio.js?v=202611101840';
+import { buildBuddha, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611101844';
+import { World, UNIT_M, makeLightPillars } from './world.js?v=202611101844';
+import { AudioEngine } from './audio.js?v=202611101844';
 
 const $ = (id) => document.getElementById(id);
 const store = {
@@ -31,11 +31,13 @@ const FORMS = [
   { lv: 5, name: '黄金の大仏', need: 85000, minStage: 3, scale: 1.35 },
 ];
 const COINS = {
-  zeni: { money: 10, r: 0.46, boost: 9, w: 70 },
-  koban: { money: 300, r: 0.6, boost: 6, w: 9 },
+  zeni: { money: 10, r: 0.46, boost: 11, w: 70 },  // boost: 逆重力で得る速度（m/s）
+  koban: { money: 300, r: 0.6, boost: 18, w: 9 },
   goriyaku: { money: 500, r: 0.45, boost: 16, w: 2.2 },
   noroi: { money: 0, r: 0.38, boost: -5, w: 0 },
 };
+// 物理の定数（m/s, m/s²）
+const PHYS = { g: 9.8, drag: 0.0042, camDown: 1.5 /* ユニット/秒 */ };
 const FEVER_AT = 0.82, HENSHIN_NEED = 14;
 const XB = 5.6;           // 左右の移動範囲
 const VIEW_H = 17.5, VIEW_W = 12;
@@ -509,14 +511,13 @@ function update(dt) {
     emit(G.bx, G.by - 0.8, 0, 0xd8c8a0, 30, 4, 0.8, 4);
   }
 
-  // 上昇の勢い：吸った硬貨で加速し、吸わなければ重力で減速する
-  if (G.dai > 0) G.v += 25 * dt;
-  else G.v += ((G.gori > 0 ? 18 * Math.min(1, G.gori / 2) : 0) - st.grav) * dt; // 黄金の御利益コインで加速度が増す
-  const vm = maxSpeed();
-  if (G.v > vm) G.v += (vm - G.v) * Math.min(1, 2 * dt);
-  G.v = Math.min(G.v, vm + 10); // 上乗せの加速は最高速度+10m/sまで
-  G.v = Math.max(-30, G.v); // はっきり落ちていく
-  if (G.v < 0 && Math.random() < dt * 1.2) floatText(G.bx, G.by + 3.2, 0, '勢いが尽きた…硬貨を吸え！', '#ffb0b0', 18, 0.8);
+  // 物理：重力と、硬貨で得る逆重力（上向きの力）、空気抵抗
+  let up = 0;
+  if (G.anti > 0) { up += G.antiA; G.anti -= dt; }           // 硬貨を吸った直後の逆重力
+  if (G.gori > 0) up += 14 * Math.min(1, G.gori / 1.5);     // 御利益コイン：しばらく逆重力が続く
+  if (G.dai > 0) up += 22;                                   // 大仏：強い浮力
+  const drag = PHYS.drag * G.v * Math.abs(G.v);              // 空気抵抗（落下にも上昇にも上限が生まれる）
+  G.v += (up - PHYS.g - drag) * dt;
   G.by += (G.v / UNIT_M) * dt;
   G.score += Math.max(0, G.v) * dt * (G.dai > 0 ? 3 : 1) | 0;
 
@@ -548,14 +549,13 @@ function update(dt) {
   G.lift += (liftTarget - G.lift) * Math.min(1, dt * (liftTarget > G.lift ? 9 : 2.2));
   G.thrust = Math.max(G.gori > 0 || G.dai > 0 ? 1.2 : 0, G.thrust - dt * 2.2);
   G.surge = (G.surge || 0) * Math.pow(0.002, dt);
-  // 画面は一定の速さで上へ進み続ける（最初の数秒はゆっくり始まる）
-  const ramp = Math.min(1, (G.time - G.launchedAt) / 4);
-  G.camY += (st.scroll * ramp / UNIT_M) * dt;
-  // 速ければ画面ごと押し上げる（仏像は画面の中ほどより上には行かない）
-  if (G.by > G.camY - 1.2) G.camY = G.by + 1.2;
-  // 画面の下まで沈んだらアウト
+  // カメラは仏像の実際の高度を追う：上昇はしっかり追い、落下はゆっくりしか追わない
+  const camTarget = G.by + 1.4;
+  if (camTarget > G.camY) G.camY += (camTarget - G.camY) * Math.min(1, dt * 6);
+  else G.camY = Math.max(camTarget, G.camY - PHYS.camDown * dt);
+  // 地面に落ちる、または画面の下まで落ちたらアウト
   G.danger = THREE.MathUtils.clamp(1 - (G.by - (G.camY - viewHalfH)) / 5, 0, 1);
-  if (G.by < G.camY - viewHalfH + 0.6) { gameOver(); return; }
+  if (G.by < G.camY - viewHalfH + 0.6 || (G.by < 0.2 && G.v < 0)) { gameOver(); return; }
 
   // 硬貨の道を先まで敷く
   extendPath(G.camY + viewHalfH + 12);
@@ -632,7 +632,7 @@ function update(dt) {
         if (stomp || G.dai > 0 || G.gori > 0) {
           // 撃ち落として、仏像はジャンプ（浮力を得る）
           f.dead = true; f.vy = -4; f.vx = (f.x - G.bx) * 2 + (Math.random() - 0.5) * 2;
-          G.v = Math.max(G.v, 0) + 12; G.surge = 1.6; G.fovKick += 6; G.shake = 0.35; G.score += 300;
+          G.v = Math.max(-G.v * 0.6, 0) + 14; G.surge = 1.6; // 反発してジャンプ G.fovKick += 6; G.shake = 0.35; G.score += 300;
           G.combo++; G.comboT = 0.85; G.stomps = (G.stomps || 0) + 1;
           audio.stomp(); flash(0.12);
           emit(f.x, f.y, 0, 0x2a2a33, 22, 5, 0.9, 6);           // 羽根が散る
@@ -690,7 +690,11 @@ function absorb(c) {
   const mult = 1 + Math.min(4, Math.floor(G.combo / 15));
   G.money += d.money; G.stageMoney += d.money;
   G.score += d.money * mult * (G.dai > 0 ? 2 : 1);
-  G.v += d.boost * (1 + Math.min(G.combo, 40) * 0.015) * (G.v > maxSpeed() ? 0.3 : G.v < 0 ? 2 : 1); // 吸うたびに加速（連続ほど強く・落下中は起死回生で2倍）
+  // 吸うと逆重力が働く（連続ほど強く・落下中は強めに）
+  // 速く昇っているときほど効きにくい（速度が暴走しないように）
+  const k = (1 + Math.min(G.combo, 40) * 0.012) * (G.v < 0 ? 1.5 : THREE.MathUtils.clamp(1 - G.v / 60, 0.1, 1));
+  const rest = G.anti > 0 ? G.antiA * G.anti : 0; // まだ残っている逆重力の分も足す
+  G.anti = 0.3; G.antiA = (rest + d.boost * k) / 0.3;
   G.thrust = Math.min(2.5, G.thrust + d.boost * 0.35 + 0.15);
   G.fovKick += Math.min(1.2, d.boost * 0.9);
   // 吸った瞬間に上へ：位置を押し上げ、仏像が跳ね、カメラは遅れて追う
@@ -705,7 +709,7 @@ function absorb(c) {
     inhale(30, 3.2, 0xffe066);
     inhaleRing(4.5, 0xffe08a);
   } else if (c.type === 'goriyaku') {
-    audio.goriyaku(); G.gori = 6; flash(0.5); G.fovKick += 16; G.shake = 0.5; G.lift = Math.min(2.8, G.lift + 1.5); G.surge = 1.6;
+    audio.goriyaku(); G.gori = 6; G.v = Math.max(G.v, 0) + 10; flash(0.5); G.fovKick += 16; G.shake = 0.5; G.lift = Math.min(2.8, G.lift + 1.5); G.surge = 1.6;
     banner('御利益！', '');
     inhale(70, 5, 0xfff2a0);
     inhaleRing(8, 0xfff2b0); setTimeout(() => G && inhaleRing(5, 0xfff2b0), 150);
