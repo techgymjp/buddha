@@ -4,9 +4,9 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { buildBuddha, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611101814';
-import { World, UNIT_M, makeLightPillars } from './world.js?v=202611101814';
-import { AudioEngine } from './audio.js?v=202611101814';
+import { buildBuddha, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611101830';
+import { World, UNIT_M, makeLightPillars } from './world.js?v=202611101830';
+import { AudioEngine } from './audio.js?v=202611101830';
 
 const $ = (id) => document.getElementById(id);
 const store = {
@@ -16,11 +16,11 @@ const store = {
 
 // ---------- 定数 ----------
 const STAGES = [
-  { name: '地上の寺院', goal: 1800, curse: 0.07, foeRate: 0.32, foes: ['crow'], grav: 4, scroll: 12 },
-  { name: '山頂',       goal: 1500, curse: 0.11, foeRate: 0.42, foes: ['crow', 'crow', 'crow', 'thunder'], grav: 4.6, scroll: 14 },
-  { name: '雲海',       goal: 1800, curse: 0.15, foeRate: 0.48, foes: ['crow', 'crow', 'thunder'], grav: 5.2, scroll: 16 },
-  { name: '天空',       goal: 2100, curse: 0.19, foeRate: 0.5, foes: ['crow', 'crow', 'thunder'], grav: 5.8, scroll: 18 },
-  { name: '極楽浄土',   goal: 2400, curse: 0.22, foeRate: 0.25, foes: ['crow'], grav: 6.4, scroll: 20 },
+  { name: '地上の寺院', goal: 1800, curse: 0.07, foeRate: 0.32, foes: ['crow'], grav: 6.5, scroll: 12 },
+  { name: '山頂',       goal: 1500, curse: 0.11, foeRate: 0.42, foes: ['crow', 'crow', 'crow', 'thunder'], grav: 7.3, scroll: 14 },
+  { name: '雲海',       goal: 1800, curse: 0.15, foeRate: 0.48, foes: ['crow', 'crow', 'thunder'], grav: 8.1, scroll: 16 },
+  { name: '天空',       goal: 2100, curse: 0.19, foeRate: 0.5, foes: ['crow', 'crow', 'thunder'], grav: 8.9, scroll: 18 },
+  { name: '極楽浄土',   goal: 2400, curse: 0.22, foeRate: 0.25, foes: ['crow'], grav: 9.7, scroll: 20 },
 ];
 let acc = 0; STAGES.forEach((s) => { s.start = acc; acc += s.goal; });
 const FORMS = [
@@ -31,7 +31,7 @@ const FORMS = [
   { lv: 5, name: '黄金の大仏', need: 85000, minStage: 3, scale: 1.35 },
 ];
 const COINS = {
-  zeni: { money: 10, r: 0.46, boost: 7, w: 70 },
+  zeni: { money: 10, r: 0.46, boost: 9, w: 70 },
   koban: { money: 300, r: 0.6, boost: 6, w: 9 },
   goriyaku: { money: 500, r: 0.45, boost: 16, w: 2.2 },
   noroi: { money: 0, r: 0.38, boost: -5, w: 0 },
@@ -413,19 +413,16 @@ function spawnFoe(cy, halfH) {
   if (!st.foes.length) return;
   const kind = st.foes[Math.random() * st.foes.length | 0];
   if (kind === 'crow') {
-    const dir = Math.random() < 0.5 ? 1 : -1;
+    // 仏像より下を横切るカラス（上から落ちて踏みつけると撃ち落としてジャンプ）
+    const crows = G.foes.filter((f) => f.kind === 'crow' && !f.dead);
+    if (crows.length >= 2) return; // 同時に出るのは2羽まで
+    const bottom = cy - halfH;
+    const y = Math.max(bottom + 1.2, G.by - 1.5 - Math.random() * 4);
+    if (crows.some((f) => Math.abs(f.y - y) < 3)) return; // ほかのカラスと高さをずらす（縦に並ばないように）
+    const dir = crows.length && Math.random() < 0.7 ? -Math.sign(crows[0].vx) : (Math.random() < 0.5 ? 1 : -1);
     const obj = makeCrow(); obj.scale.setScalar(1.3); scene.add(obj);
-    if (Math.random() < 0.75) {
-      // 下から斜めに飛び上がってくるカラス（上に乗って踏みつけられる）
-      const x = (Math.random() - 0.5) * 2 * (XB - 0.5), y = cy - halfH - 2;
-      obj.rotation.y = dir > 0 ? 0 : Math.PI;
-      G.foes.push({ kind, obj, x, y, vx: dir * (0.6 + Math.random() * 0.8), vy: 0, rel: 1.8 + Math.random() * 1.2, t: 0, r: 0.45, rising: true });
-    } else {
-      // 上を横切るカラス（頭からぶつかると危ない）
-      const y = G.by + 6 + Math.random() * 5;
-      obj.rotation.y = dir > 0 ? 0 : Math.PI;
-      G.foes.push({ kind, obj, x: -dir * 12, y, vx: dir * (3 + Math.random() * 1.5 + G.stage * 0.4), vy: 0, t: 0, r: 0.45 });
-    }
+    obj.rotation.y = dir > 0 ? 0 : Math.PI;
+    G.foes.push({ kind, obj, x: -dir * 12, y, vx: dir * (1.8 + Math.random() * 3 + G.stage * 0.3), vy: (Math.random() - 0.5) * 0.6, bob: 0.4 + Math.random() * 0.6, t: Math.random() * 6, r: 0.5 });
   } else {
     const obj = new THREE.Group();
     for (let i = 0; i < 7; i++) {
@@ -491,7 +488,7 @@ function update(dt) {
   const vm = maxSpeed();
   if (G.v > vm) G.v += (vm - G.v) * Math.min(1, 2 * dt);
   G.v = Math.min(G.v, vm + 10); // 上乗せの加速は最高速度+10m/sまで
-  G.v = Math.max(-9, G.v);
+  G.v = Math.max(-30, G.v); // はっきり落ちていく
   if (G.v < 0 && Math.random() < dt * 1.2) floatText(G.bx, G.by + 3.2, 0, '勢いが尽きた…硬貨を吸え！', '#ffb0b0', 18, 0.8);
   G.by += (G.v / UNIT_M) * dt;
   G.score += Math.max(0, G.v) * dt * (G.dai > 0 ? 3 : 1) | 0;
@@ -591,20 +588,13 @@ function update(dt) {
         if (f.y < G.camY - viewHalfH - 4) { scene.remove(f.obj); G.foes.splice(i, 1); }
         continue;
       }
-      f.x += f.vx * dt; f.y += (f.vy + Math.sin(f.t * 4) * 0.6) * dt;
-      if (f.rising) { // 仏像より少し速く上がり、仏像のほうへゆるやかに寄ってくる（上に乗れば踏める）
-        f.vy = Math.max(G.v, STAGES[G.stage].scroll) / UNIT_M + f.rel;
-        const want = THREE.MathUtils.clamp((G.bx - f.x) * 0.9, -2.2, 2.2);
-        f.vx += (want - f.vx) * Math.min(1, dt * 1.2);
-        f.obj.rotation.y = f.vx > 0 ? 0 : Math.PI;
-      }
+      f.x += f.vx * dt; f.y += (f.vy + Math.sin(f.t * 3) * (f.bob || 0.6)) * dt;
       f.obj.position.set(f.x, f.y, 0.3);
-      f.obj.rotation.z = f.rising ? (f.vx > 0 ? 0.5 : -0.5) * (f.obj.rotation.y ? -1 : 1) : 0;
       const flap = Math.sin(f.t * 16) * 0.9;
       f.obj.userData.wings[0].rotation.x = -flap; f.obj.userData.wings[1].rotation.x = flap;
       if (Math.hypot(G.bx - f.x, G.by + 0.7 * S - f.y) < 0.75 * S + f.r) {
         // 仏像の下側で当たった＝上から踏みつけた（下から来るカラスは胸の高さまでなら踏める）
-        const stomp = f.y < G.by + (f.rising ? 1.2 : 0.35) * S;
+        const stomp = f.y < G.by + 0.45 * S;
         if (stomp || G.dai > 0 || G.gori > 0) {
           // 撃ち落として、仏像はジャンプ（浮力を得る）
           f.dead = true; f.vy = -4; f.vx = (f.x - G.bx) * 2 + (Math.random() - 0.5) * 2;
@@ -619,10 +609,9 @@ function update(dt) {
         // 横や上からぶつかったら即アウト
         audio.hit(); flash(0.5); G.shake = 1;
         emit(f.x, f.y, 0, 0x222228, 30, 6, 1);
-        G.lastHit = { rising: !!f.rising, dy: +(f.y - G.by).toFixed(2), dx: +(f.x - G.bx).toFixed(2) };
         gameOver('カラスに当たった！'); return;
       }
-      if (f.y > G.camY + viewHalfH + 6) { scene.remove(f.obj); G.foes.splice(i, 1); continue; }
+      if (f.y > G.camY + viewHalfH + 6 || f.y < G.camY - viewHalfH - 3) { scene.remove(f.obj); G.foes.splice(i, 1); continue; }
       if (Math.abs(f.x) > 16) { scene.remove(f.obj); G.foes.splice(i, 1); continue; }
     } else {
       f.x += f.vx * dt; if (Math.abs(f.x) > XB) f.vx *= -1;
