@@ -4,10 +4,10 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { buildBuddha, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611102004';
-import { World, UNIT_M, makeLightPillars } from './world.js?v=202611102004';
-import { t, lang, setLang, applyStatic } from './i18n.js?v=202611102004';
-import { AudioEngine } from './audio.js?v=202611102004';
+import { buildBuddha, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611102027';
+import { World, UNIT_M, makeLightPillars } from './world.js?v=202611102027';
+import { t, lang, setLang, applyStatic } from './i18n.js?v=202611102027';
+import { AudioEngine } from './audio.js?v=202611102027';
 
 const $ = (id) => document.getElementById(id);
 const store = {
@@ -77,7 +77,7 @@ const APP_ASPECT = 9 / 19.5;
 let appW = 390, appH = 844;
 function resize() {
   const W = window.innerWidth, H = window.innerHeight;
-  if (W / H <= 0.62) { appW = W; appH = H; } // スマホの縦画面はそのまま全面
+  if (isMobile || W / H <= 0.62) { appW = W; appH = H; } // タッチ端末（スマホ・タブレット）は縦横比に関係なく全面。PCだけ縦長の枠
   else { appH = H; appW = Math.round(H * APP_ASPECT); }
   const app = $('app'); app.style.width = appW + 'px'; app.style.height = appH + 'px';
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, QUALITY[quality][0]));
@@ -399,17 +399,18 @@ function newSegment(P) {
   else { P.mode = 'wave'; P.left = 8; P.amp = 1; P.freq = 0.4; }
 }
 // カラスは実際の高度に配置し、その高度で左右を行き来する（仏像についてこない）
-const CROW_GAP = [14, 12, 11, 10, 15]; // カラスどうしの高さの間隔（ユニット）
+const CROW_GAP = [22, 17, 15, 14, 18]; // カラスどうしの高さの間隔（ユニット）
 function placeCrows(limitY) {
   if (G.nextCrowY == null) G.nextCrowY = G.by + 30; // 最初のカラスは十分上から
   while (G.nextCrowY < limitY) {
     const y = G.nextCrowY;
     // 間隔は指数分布：広い空白が続くことも、2羽が近い高さに続くこともある
-    G.nextCrowY += THREE.MathUtils.clamp(-Math.log(1 - Math.random()) * CROW_GAP[G.stage], 2.5, CROW_GAP[G.stage] * 3.5);
+    const gap = CROW_GAP[G.stage] / hardness(); // 高いほどカラスが増える
+    G.nextCrowY += THREE.MathUtils.clamp(-Math.log(1 - Math.random()) * gap, 2.5, gap * 3.5);
     if (G.fever || !STAGES[G.stage].foes.includes('crow')) continue;
     // その高度が画面に入ってきたら、画面の端から飛び始めて横切る
     const obj = makeCrow(); obj.scale.setScalar(1.3); obj.visible = false; scene.add(obj);
-    G.foes.push({ kind: 'crow', obj, x: 0, y, vx: 0, vy: 0, waiting: true, speed: 2.4 + Math.random() * 2 + G.stage * 0.3, bob: 0.25 + Math.random() * 0.3, t: Math.random() * 6, r: 0.5 });
+    G.foes.push({ kind: 'crow', obj, x: 0, y, vx: 0, vy: 0, waiting: true, speed: (1.8 + Math.random() * 1.4 + G.stage * 0.2) * Math.sqrt(hardness()), bob: 0.25 + Math.random() * 0.3, t: Math.random() * 6, r: 0.5 });
   }
 }
 function extendPath(limitY) {
@@ -504,6 +505,8 @@ function maxSpeed() {
   return STAGES[G.stage].scroll + 8 + G.form * 1.5 + (G.gori > 0 ? 16 : 0) + (G.dai > 0 ? 25 : 0);
 }
 const altM = () => Math.max(0, G.by * UNIT_M);
+// 難しさ：1,500mを超えると高度に応じて上がっていく（終わりのない区間でもいずれ限界が来る）
+const hardness = () => 1 + Math.max(0, altM() - 2000) / 11000;
 window.__altM = () => altM();
 
 // ---------- 更新 ----------
@@ -544,7 +547,7 @@ function update(dt) {
   if (G.gori > 0) up += 22 * Math.min(1, G.gori / 1.5);     // 御利益コイン：しばらく逆重力が続く
   if (G.dai > 0) up += 32;                                   // 大仏：強い浮力
   const drag = PHYS.drag * G.v * Math.abs(G.v);              // 空気抵抗（落下にも上昇にも上限が生まれる）
-  G.v += (up - PHYS.g - drag) * dt;
+  G.v += (up - PHYS.g * Math.sqrt(hardness()) - drag) * dt; // 高いほど重力が強い
   G.by += (G.v / UNIT_M) * dt;
   G.score += Math.max(0, G.v) * dt * (G.dai > 0 ? 3 : 1) | 0;
 
@@ -563,6 +566,10 @@ function update(dt) {
     audio.koban();
   }
 
+  if (G.dai > 0) { // 大仏変身は5秒で終わる
+    G.daiT -= dt;
+    if (G.daiT <= 0) { G.dai = 0; setModel(FORMS[G.form].lv); audio.gong(); flash(0.3); shockwave(G.bx, G.by + 1, 0xfff0c0, 8); }
+  }
   G.gori = Math.max(0, G.gori - dt); G.curse = Math.max(0, G.curse - dt); G.inv = Math.max(0, G.inv - dt);
   G.comboT -= dt;
   if (G.comboT <= 0 && G.combo > 0) {
@@ -600,7 +607,7 @@ function update(dt) {
   mouthW.set(G.bx, G.by + 2.7 * S, -0.2);           // 吸い込み口は頭上
   const tx = G.bx, ty = G.by + 2.7 * S;
   const cx = G.bx, cy = ty + R * 0.75;          // 吸引範囲は仏像の上に伸びる
-  const rx = Math.min(R * 0.3, 1.5) + (G.dai > 0 ? 6 : 0), ry = R * 1.4; // 真上の細い柱だけを吸う // 横幅は細く：左右に動いて狙う
+  const rx = Math.min(R * 0.25, 1.15) + (G.gori > 0 ? 0.8 : 0) + (G.dai > 0 ? 6 : 0), ry = R * 1.4; // 真上の細い柱だけを吸う // 横幅は細く：左右に動いて狙う
   G.suck = { cx, cy, rx, ry, tx, ty };
   const bvy = G.v / UNIT_M;
   const damp = Math.pow(0.02, dt);
@@ -649,7 +656,7 @@ function update(dt) {
         continue;
       }
       if (f.waiting) { // まだ画面に入っていない高度のカラスは待機
-        if (f.y > G.camY + viewHalfH + 1) continue;
+        if (f.y > G.camY + viewHalfH + 7) continue; // 画面に入る少し前から飛び始める
         const dir = Math.random() < 0.5 ? 1 : -1;
         f.waiting = false; f.x = -dir * (XB + 3); f.vx = dir * f.speed;
         f.obj.visible = true; f.obj.rotation.y = dir > 0 ? 0 : Math.PI;
@@ -659,10 +666,10 @@ function update(dt) {
       f.obj.position.set(f.x, f.y, 0.3);
       const flap = Math.sin(f.t * 16) * 0.9;
       f.obj.userData.wings[0].rotation.x = -flap; f.obj.userData.wings[1].rotation.x = flap;
-      if (Math.hypot(G.bx - f.x, G.by + 0.7 * S - f.y) < 0.75 * S + f.r) {
+      if (Math.hypot(G.bx - f.x, G.by + 0.7 * S - f.y) < 0.55 * S + f.r * 0.7) { // 当たり判定は見た目より少し小さく
         // 仏像の下側で当たった＝上から踏みつけた（下から来るカラスは胸の高さまでなら踏める）
         const stomp = f.y < G.by + 0.45 * S;
-        if (stomp || G.dai > 0 || G.gori > 0) {
+        if (stomp || G.dai > 0) { // 無敵なのは大仏変身中だけ
           // 撃ち落として、仏像はジャンプ（浮力を得る）
           f.dead = true; f.vy = -4; f.vx = (f.x - G.bx) * 2 + (Math.random() - 0.5) * 2;
           G.v = Math.max(-G.v * 0.6, 0) + 20; G.surge = 1.6; // 反発してジャンプ G.fovKick += 6; G.shake = 0.35; G.score += 300;
@@ -740,7 +747,7 @@ function absorb(c) {
     inhale(30, 3.2, 0xffe066);
     inhaleRing(4.5, 0xffe08a);
   } else if (c.type === 'goriyaku') {
-    audio.goriyaku(); G.gori = 6; G.v = Math.max(G.v, 0) + 10; flash(0.5); G.fovKick += 16; G.shake = 0.5; G.lift = Math.min(2.8, G.lift + 1.5); G.surge = 1.6;
+    audio.goriyaku(); G.gori = 3.5; G.v = Math.max(G.v, 0) + 10; flash(0.5); G.fovKick += 16; G.shake = 0.5; G.lift = Math.min(2.8, G.lift + 1.5); G.surge = 1.6;
     banner('御利益！', '');
     inhale(70, 5, 0xfff2a0);
     inhaleRing(8, 0xfff2b0); setTimeout(() => G && inhaleRing(5, 0xfff2b0), 150);
@@ -767,7 +774,7 @@ function absorb(c) {
 }
 
 function henshin() {
-  G.dai = 1; G.henshins++; G.v += 25; G.fovKick += 16; G.shake = 0.8;
+  G.dai = 1; G.daiT = 5; G.henshins++; G.v += 25; G.fovKick += 16; G.shake = 0.8;
   setModel(5);
   flash(0.9); audio.henshin();
   banner('大仏変身！！', '天へ駆け上がれ！');
@@ -828,11 +835,14 @@ function gameOver(reason = '') {
   audio.over();
   const alt = Math.floor(G.maxAlt || altM());
   const isBest = alt > prevBest;
-  $('resTitle').textContent = reason ? t('crowHit') : t('fell');
+  const head = reason ? t('crowHit') : t('fell');
+  $('resTitle').textContent = head;
+  // 見出しは枠に収まる範囲でできるだけ大きく（文字数で決める）
+  $('resTitle').style.fontSize = `min(${Math.min(16, 88 / (head.length * (lang === 'en' ? 0.62 : 1)))}cqw, 64px)`;
   $('resAlt').textContent = alt.toLocaleString() + 'm';
   $('resMoney').textContent = G.money.toLocaleString();
-  $('resRibbon').textContent = isBest ? t('newBest') : t('rankLabel', { r: rank(alt) });
-  $('resLines').innerHTML = [t('reached', { s: stageLabel(G.stage) }), t('rankLabel', { r: `<b>${rank(alt)}</b>` }), t('bestLine', { m: best.alt.toLocaleString() })].join('<br>');
+  $('resRibbon').textContent = t('rankLabel', { r: rank(alt) });
+  $('resLines').innerHTML = [isBest ? `<b>${t('newBest')}</b>` : t('bestLine', { m: best.alt.toLocaleString() }), t('reached', { s: stageLabel(G.stage) })].join('<br>');
   $('resNext').textContent = t('again');
   show('result', true); show('hud', false);
 }
@@ -1082,4 +1092,4 @@ function loop(now) {
 requestAnimationFrame(loop);
 
 // 動作確認用
-window.__buddha = { get state() { return state; }, get G() { return G; }, input, setModel, world, camera, scene, renderer, composer, step(n, dt = 1 / 60) { for (let i = 0; i < n && state === 'play'; i++) update(dt); } };
+window.__buddha = { get state() { return state; }, get G() { return G; }, input, setModel, world, camera, scene, renderer, composer, step(n, dt = 1 / 60) { for (let i = 0; i < n && state === 'play'; i++) update(dt); }, restart() { show('result', false); startGame(); } };
