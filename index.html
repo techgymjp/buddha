@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Old+Mincho:wght@700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=202611102034">
+<link rel="stylesheet" href="style.css?v=202611102039">
 <script type="importmap">
 { "imports": { "three": "./vendor/three.module.min.js", "three/addons/": "./vendor/addons/" } }
 </script>
@@ -56,6 +56,7 @@
   <div class="title-bottom">
     <button class="btn gold-btn big" id="startBtn" type="button">スタート</button>
     <div class="row">
+      <button class="btn round" id="templeBtn" type="button" data-i18n="templeBtn">お寺</button>
       <button class="btn round" id="howBtn" type="button" data-i18n="howBtn">遊び方</button>
       <button class="btn round" id="soundBtn" type="button">♪ 音</button>
       <button class="btn round" id="langBtn" type="button" data-i18n="langBtn">English</button>
@@ -76,6 +77,17 @@
     </div>
         <p class="evo-line" data-i18n-html="storm"></p>
     <button class="btn gold-btn" id="howClose" type="button" data-i18n="close">閉じる</button>
+  </div>
+</section>
+
+<section id="templeScr" class="screen hidden">
+  <div class="card">
+    <h2 class="gold" data-i18n="templeTitle">お寺</h2>
+    <div class="wallet"><span data-i18n="walletLbl">お寺の財布</span> <b id="wallet">¥0</b></div>
+    <div class="blist" id="bList"></div>
+    <h3 data-i18n="skinTitle">仏像を選ぶ</h3>
+    <div class="skins" id="skinList"></div>
+    <button class="btn gold-btn" id="templeClose" type="button" data-i18n="close">閉じる</button>
   </div>
 </section>
 
@@ -104,6 +116,6 @@
 <div id="nogl" class="screen hidden"><div class="card"><h2 class="gold" data-i18n="noglTitle">WebGLが使えません</h2><p data-i18n="noglText">このゲームは3D表示（WebGL）に対応したブラウザで遊べます。</p></div></div>
 
 </div>
-<script type="module" src="js/main.js?v=202611102034"></script>
+<script type="module" src="js/main.js?v=202611102039"></script>
 </body>
 </html>

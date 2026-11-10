@@ -134,6 +134,15 @@ const stoneTex = canvasTex(256, 256, (g, w, h) => { g.fillStyle = '#8d8a82'; g.f
 stoneTex.wrapS = stoneTex.wrapT = THREE.RepeatWrapping;
 
 export const MAT = {
+  porcelain: new THREE.MeshPhysicalMaterial({ color: 0xf6f2ea, roughness: 0.22, clearcoat: 1, clearcoatRoughness: 0.08, emissive: 0x1a1814, emissiveIntensity: 0.4 }),
+  fudo: new THREE.MeshPhysicalMaterial({ color: 0x24406a, roughness: 0.35, metalness: 0.2, clearcoat: 0.6, emissive: 0x0a1428, emissiveIntensity: 0.6 }),
+  inkHair: new THREE.MeshStandardMaterial({ color: 0x1a1a24, roughness: 0.6 }),
+  flame: new THREE.MeshStandardMaterial({ color: 0xff5a1a, emissive: 0xff3000, emissiveIntensity: 1.6, roughness: 0.5 }),
+  flameIn: new THREE.MeshStandardMaterial({ color: 0xffb030, emissive: 0xff8a00, emissiveIntensity: 1.4, roughness: 0.5 }),
+  steel: new THREE.MeshStandardMaterial({ color: 0xdfe6ee, metalness: 1, roughness: 0.15 }),
+  darumaRed: new THREE.MeshPhysicalMaterial({ color: 0xc81e16, roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.1, emissive: 0x2a0402, emissiveIntensity: 0.5 }),
+  white: new THREE.MeshStandardMaterial({ color: 0xfaf6ec, roughness: 0.5 }),
+  ink: new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.4 }),
   patina: new THREE.MeshStandardMaterial({ map: patinaTex, bumpMap: patinaBump, bumpScale: 0.15, metalness: 0, roughness: 0.88, envMapIntensity: 0.35, emissive: 0x161c18, emissiveIntensity: 0.6 }),
   stone: new THREE.MeshStandardMaterial({ map: stoneTex, color: 0xd8d4cc, roughness: 0.95 }),
   wood: new THREE.MeshStandardMaterial({ color: 0xffe2b8, map: woodTex, roughness: 0.55, metalness: 0, bumpMap: woodTex, bumpScale: 0.6, envMapIntensity: 0.5 }),
@@ -246,17 +255,17 @@ function buildKamakuraBody(body, mat) {
  * 仏像を組み立てる
  * lv: 1木造仏 2黒漆 3光背巨大化 4鎌倉の大仏 5黄金の奈良の大仏
  */
-export function buildBuddha(lv) {
+export function buildBuddha(lv, o = {}) {
   const root = new THREE.Group();
   const body = new THREE.Group(); root.add(body);
-  const mat = lv === 1 ? MAT.wood : lv === 2 ? MAT.lacquer : lv === 4 ? MAT.patina : lv === 5 ? MAT.goldGreat : MAT.gold;
+  const mat = o.mat || (lv === 1 ? MAT.wood : lv === 2 ? MAT.lacquer : lv === 4 ? MAT.patina : lv === 5 ? MAT.goldGreat : MAT.gold);
   const haloMat = lv === 2 ? MAT.gold : mat; // 黒漆の仏像は金の光背
-  const hairMat = mat;
+  const hairMat = o.hair || mat;
 
   // --- 蓮台 ---
   const ped = new THREE.Group(); body.add(ped);
   if (lv === 4) ped.scale.set(1.35, 0.8, 1.2); // 鎌倉の大仏：広く低い石の台座
-  const petalMat = lv === 1 ? MAT.wood : lv === 5 ? MAT.goldGreat : lv === 2 ? MAT.gold : lv === 4 ? MAT.stone : MAT.lotus;
+  const petalMat = o.petal || (lv === 1 ? MAT.wood : lv === 5 ? MAT.goldGreat : lv === 2 ? MAT.gold : lv === 4 ? MAT.stone : MAT.lotus);
   // [枚数, 半径, 高さ, 外への傾き]
   const tiers = lv === 5 ? [[16, 1.05, -0.12, 0.6], [16, 0.97, -0.3, 0.9], [16, 0.86, -0.48, 1.2]] : [[18, 0.9, -0.05, 0.55], [18, 0.84, -0.22, 0.95], [14, 0.72, -0.38, 1.25]];
   tiers.forEach(([n, r, y, lean], ti) => {
@@ -390,7 +399,12 @@ export function buildBuddha(lv) {
   // --- 光背 ---
   const halo = new THREE.Group(); halo.position.set(0, 2.12, -0.5); body.add(halo);
   let glowSize = 0;
-  if (lv === 4) {
+  if (o.flame) {
+    // 不動明王：燃え上がる炎の光背（迦楼羅炎）
+    const flame = new THREE.Mesh(boatHaloGeometry(5.2, 2.0, true), MAT.flame); flame.position.set(0, -0.6, -0.15); halo.add(flame);
+    const inner = new THREE.Mesh(boatHaloGeometry(4.0, 1.5, true), MAT.flameIn); inner.position.set(0, -0.7, -0.08); halo.add(inner);
+    glowSize = 5;
+  } else if (lv === 4) {
     // 鎌倉の大仏は光背なし
   } else if (lv === 1) {
     const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.78, 0.78, 0.05, 48), MAT.woodDark); disc.rotation.x = Math.PI / 2; halo.add(disc);
@@ -455,10 +469,45 @@ export function buildBuddha(lv) {
     root.userData.glow = glow;
   }
 
+  if (o.sword) { // 右手に立てた剣
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.07, 1.3, 0.02), MAT.steel); blade.position.set(0.72, 1.25, 0.55); body.add(blade);
+    const hilt = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.3, 8), MAT.gold); hilt.position.set(0.72, 0.5, 0.55); body.add(hilt);
+    const guard = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.05, 0.08), MAT.gold); guard.position.set(0.72, 0.66, 0.55); body.add(guard);
+  }
   mergeStatic(halo);
   mergeStatic(root, new Set([mouth, lipU, lipL, halo]));
-  root.userData = { ...root.userData, mouth, lipU, lipL, halo, body, lv, mouthLocal: V(0, 1.85, 0.42) };
+  root.userData = { ...root.userData, mouth, lipU, lipL, halo, body, lv: o.skin || lv, mouthLocal: V(0, 1.85, 0.42) };
   root.traverse((o) => { if (o.isMesh) { o.castShadow = false; } });
+  return root;
+}
+
+// ---------- 寄進で解放される仏像 ----------
+export function buildSkin(name) {
+  if (name === 'kannon') return buildBuddha(2, { mat: MAT.porcelain, hair: MAT.inkHair, petal: MAT.gold, skin: 'kannon' }); // 白衣観音
+  if (name === 'fudo') return buildBuddha(1, { mat: MAT.fudo, hair: MAT.inkHair, petal: MAT.stone, flame: true, sword: true, skin: 'fudo' }); // 不動明王
+  if (name === 'daruma') return buildDaruma();
+  return null;
+}
+function buildDaruma() {
+  const root = new THREE.Group(); const body = new THREE.Group(); root.add(body);
+  blob(MAT.darumaRed, 0, 0.95, 0, 1.0, 1.1, 0.95, body);                 // 赤い丸い体
+  blob(MAT.white, 0, 1.25, 0.62, 0.55, 0.46, 0.3, body);                  // 白い顔
+  for (const sx of [-1, 1]) {
+    blob(MAT.white, sx * 0.2, 1.32, 0.86, 0.14, 0.14, 0.06, body);        // 白目
+    blob(MAT.ink, sx * 0.2, 1.32, 0.9, sx < 0 ? 0.07 : 0.0001, sx < 0 ? 0.07 : 0.0001, 0.03, body); // 片目だけ墨を入れる
+    const brow = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.035, 6, 16, Math.PI * 0.8), MAT.ink); brow.position.set(sx * 0.2, 1.46, 0.84); brow.rotation.z = 0.3 + (sx > 0 ? 0 : 0); body.add(brow);
+    const beard = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.03, 6, 16, Math.PI), MAT.ink); beard.position.set(sx * 0.18, 1.08, 0.86); beard.rotation.z = Math.PI + sx * 0.4; body.add(beard);
+  }
+  // 金の模様
+  for (let i = 0; i < 3; i++) { const t = new THREE.Mesh(new THREE.TorusGeometry(0.55 + i * 0.12, 0.025, 6, 32, Math.PI * 0.9), MAT.gold); t.position.set(0, 0.55, 0.72 - i * 0.06); t.rotation.set(0, 0, Math.PI * 1.05); body.add(t); }
+  const kanji = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.04, 6, 24), MAT.gold); kanji.position.set(0, 0.45, 0.92); body.add(kanji);
+  const cushion = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.95, 0.25, 32), MAT.goldWarm); cushion.position.y = -0.05; body.add(cushion);
+  const mouth = blob(MAT.dark, 0, 1.12, 0.92, 0.06, 0.01, 0.02, body);
+  const lipU = blob(MAT.white, 0, 1.15, 0.9, 0.001, 0.001, 0.001, body);
+  const lipL = blob(MAT.white, 0, 1.1, 0.9, 0.001, 0.001, 0.001, body);
+  const halo = new THREE.Group(); body.add(halo);
+  mergeStatic(root, new Set([mouth, lipU, lipL, halo]));
+  root.userData = { mouth, lipU, lipL, halo, body, lv: 'daruma', mouthLocal: V(0, 1.2, 0.9) };
   return root;
 }
 

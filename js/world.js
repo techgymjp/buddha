@@ -1,6 +1,6 @@
 // 世界：空、光、雲、寺院、山頂の懸造り、雲海、天空、極楽浄土
 import * as THREE from 'three';
-import { canvasTex, glowTexture, dotTexture, buildBuddha, MAT, mergeStatic } from './models.js?v=202611102034';
+import { canvasTex, glowTexture, dotTexture, buildBuddha, MAT, mergeStatic } from './models.js?v=202611102039';
 
 export const UNIT_M = 6; // 1ユニット = 6m
 
@@ -35,7 +35,9 @@ export class World {
     this.buildClouds();
     this.buildPureLand();
     // 動かない景色を材質ごとにまとめて描画回数を減らす
-    mergeStatic(this.temple);
+    const partSet = new Set(Object.values(this.parts));
+    mergeStatic(this.temple, partSet);
+    for (const part of partSet) mergeStatic(part);
     mergeStatic(this.kiyomizu);
     mergeStatic(this.pureLand, this.lotusSet);
   }
@@ -173,11 +175,16 @@ export class World {
     terrace(23, -125, 160, 60);
 
     // 本堂・中門・五重塔
+    // 寄進で建っていく建物（山門・灯籠の参道・本堂・鐘楼・五重塔・大仏殿）
     const h1 = this.makeHall(30, 18, 9, 0x9a2a1c, 1); h1.position.set(0, 11, -62); G.add(h1);
     const h2 = this.makeHall(46, 26, 12, 0x8e2418, 2); h2.position.set(0, 23, -130); G.add(h2);
-    const p1 = this.makePagoda(5, 7); p1.position.set(-38, 11, -70); G.add(p1);
-    const p2 = this.makePagoda(3, 6); p2.position.set(44, 23, -120); G.add(p2);
+    const pag = new THREE.Group(); G.add(pag);
+    const p1 = this.makePagoda(5, 7); p1.position.set(-38, 11, -70); pag.add(p1);
+    const p2 = this.makePagoda(3, 6); p2.position.set(44, 23, -120); pag.add(p2);
     const gate = this.makeHall(16, 8, 6, 0xa8301e, 1); gate.position.set(0, -2.4, -2 - 26 * 1.3 - 4); gate.scale.setScalar(0.8); G.add(gate);
+    const bell = this.makeBellTower(); bell.position.set(30, 11, -52); G.add(bell);
+    const lanterns = new THREE.Group(); G.add(lanterns);
+    this.parts = { sanmon: gate, lanterns, hondo: h1, shoro: bell, pagoda: pag, daibutsuden: h2 };
     // 鳥居
     const torii = this.makeTorii(); torii.position.set(0, 5.9, -31); torii.scale.setScalar(0.9); G.add(torii);
 
@@ -185,7 +192,7 @@ export class World {
     const lightMat = new THREE.MeshStandardMaterial({ color: 0xffb060, emissive: 0xff9a40, emissiveIntensity: 3 });
     for (let i = 0; i < 8; i++) {
       for (const sx of [-1, 1]) {
-        const l = this.makeLantern(stoneMat, lightMat); l.position.set(sx * 8.5, -2.4 + i * 1.6, -9 - i * 4.2); G.add(l);
+        const l = this.makeLantern(stoneMat, lightMat); l.position.set(sx * 8.5, -2.4 + i * 1.6, -9 - i * 4.2); lanterns.add(l);
       }
     }
     for (let i = 0; i < 26; i++) {
@@ -278,6 +285,24 @@ export class World {
     lantern.position.set(0, H * 0.55, D * 0.5); g.add(lantern);
     const base = new THREE.Mesh(new THREE.BoxGeometry(W * 1.05, 1.2, D * 1.05), new THREE.MeshStandardMaterial({ color: 0x8a857a, roughness: 0.9 })); base.position.y = -0.4; g.add(base);
     return g;
+  }
+
+  makeBellTower() {
+    const g = new THREE.Group();
+    const red = new THREE.MeshStandardMaterial({ color: 0x9a2a1c, roughness: 0.6 });
+    const stone = new THREE.MeshStandardMaterial({ color: 0x8a857a, roughness: 0.9 });
+    const base = new THREE.Mesh(new THREE.BoxGeometry(9, 2, 9), stone); base.position.y = 1; g.add(base);
+    for (const [x, z] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.35, 7, 10), red); p.position.set(x * 3, 5.5, z * 3); g.add(p); }
+    const roof = new THREE.Mesh(this.roofGeometry(10, 10, 3, 1.5, 0.45, 0.2), this.roofMat); roof.position.y = 8.8; g.add(roof);
+    // 梵鐘
+    const bellGeo = new THREE.LatheGeometry([[0, 2.2], [0.9, 2.1], [1.1, 1.0], [1.4, 0], [1.25, 0], [0, 0.15]].map(([r, y]) => new THREE.Vector2(r, y)), 32);
+    const bellM = new THREE.Mesh(bellGeo, new THREE.MeshStandardMaterial({ color: 0x5a6a5a, metalness: 0.6, roughness: 0.5 })); bellM.position.y = 5.2; g.add(bellM);
+    return g;
+  }
+
+  // 寄進の状況に応じて境内の建物を出す
+  setBuilt(built) {
+    for (const [k, part] of Object.entries(this.parts)) part.visible = built.includes(k);
   }
 
   makePagoda(tiers, w) {

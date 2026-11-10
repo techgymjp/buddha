@@ -4,10 +4,10 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { buildBuddha, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611102034';
-import { World, UNIT_M, makeLightPillars } from './world.js?v=202611102034';
-import { t, lang, setLang, applyStatic } from './i18n.js?v=202611102034';
-import { AudioEngine } from './audio.js?v=202611102034';
+import { buildBuddha, buildSkin, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611102039';
+import { World, UNIT_M, makeLightPillars } from './world.js?v=202611102039';
+import { t, lang, setLang, applyStatic } from './i18n.js?v=202611102039';
+import { AudioEngine } from './audio.js?v=202611102039';
 
 const $ = (id) => document.getElementById(id);
 const store = {
@@ -97,7 +97,7 @@ function toggleSound() { audio.setMuted(!audio.muted); store.set('muted', audio.
 function updateSoundBtns() { for (const id of ['soundBtn', 'pauseSound']) $(id).textContent = audio.muted ? t('soundOff') : t('soundOn'); }
 applyStatic();
 const stageLabel = (i) => t('stage', { n: i + 1, name: t('stages')[i] });
-const formLabel = (f) => `Lv.${f.lv} ${t('forms')[f.lv - 1]}`;
+const formLabel = (f) => skin !== 'buddha' ? `Lv.${f.lv} ${t('skins')[SKINS.indexOf(skin)]}` : `Lv.${f.lv} ${t('forms')[f.lv - 1]}`;
 updateSoundBtns();
 // 音はゲーム開始前にすべて作っておく（スマホで音が切れないように）
 $('startBtn').disabled = true;
@@ -118,14 +118,41 @@ function vib(pattern, minGap = 0) {
 let timeScale = 1, slowT = 0;
 function slowmo(sec, scale = 0.3) { slowT = Math.max(slowT, sec); timeScale = scale; }
 
+// ---------- お寺：集めた賽銭を貯めて寄進し、境内に建物が増えていく ----------
+const BUILDINGS = [
+  { id: 'sanmon', cost: 3000, unlock: 'daruma' },
+  { id: 'lanterns', cost: 8000 },
+  { id: 'hondo', cost: 20000, unlock: 'kannon' },
+  { id: 'shoro', cost: 40000 },
+  { id: 'pagoda', cost: 70000, unlock: 'fudo' },
+  { id: 'daibutsuden', cost: 120000 },
+];
+const SKINS = ['buddha', 'daruma', 'kannon', 'fudo'];
+let temple = store.get('temple', { wallet: 0, built: [] });
+let skin = store.get('skin', 'buddha');
+const hasB = (id) => temple.built.includes(id);
+const skinUnlocked = (k) => k === 'buddha' || BUILDINGS.some((b) => b.unlock === k && hasB(b.id));
+if (!skinUnlocked(skin)) skin = 'buddha';
+// 寄進で得られる永続的な強化
+function perks() {
+  return {
+    suck: 1 + (hasB('sanmon') ? 0.15 : 0) + (hasB('pagoda') ? 0.15 : 0),   // 吸引範囲
+    lift: hasB('shoro') ? 1.12 : 1,                                         // 硬貨の浮力
+    charms: (hasB('lanterns') ? 1 : 0) + (hasB('daibutsuden') ? 1 : 0),   // お守り（カラスに耐える回数）
+    start: hasB('pagoda') ? 800 : hasB('hondo') ? 300 : 0,                 // スタートの高さ（m）
+  };
+}
+
 // ---------- 仏像 ----------
 const buddhaRoot = new THREE.Group(); scene.add(buddhaRoot);
 const modelCache = {};
 let model = null;
 function setModel(lv) {
-  if (!modelCache[lv]) modelCache[lv] = buildBuddha(lv);
+  // 寄進で解放した仏像を選んでいるときは、その仏像のまま大きく育つ
+  const key = skin !== 'buddha' ? skin : lv;
+  if (!modelCache[key]) modelCache[key] = skin !== 'buddha' ? buildSkin(skin) : buildBuddha(lv);
   if (model) buddhaRoot.remove(model);
-  model = modelCache[lv];
+  model = modelCache[key];
   buddhaRoot.add(model);
 }
 setModel(1);
@@ -316,6 +343,33 @@ function refreshBest() {
 refreshBest();
 $('startBtn').addEventListener('click', () => { if (!audio.ready) return; audio.init(); startGame(); });
 $('langBtn').addEventListener('click', () => { setLang(lang === 'ja' ? 'en' : 'ja'); updateSoundBtns(); refreshBest(); if (audio.ready) $('startBtn').textContent = t('start'); hudCache = {}; });
+$('templeBtn').addEventListener('click', () => { audio.init(); renderTemple(); show('templeScr', true); });
+$('templeClose').addEventListener('click', () => show('templeScr', false));
+function renderTemple() {
+  $('wallet').textContent = '¥' + temple.wallet.toLocaleString();
+  const next = BUILDINGS.findIndex((b) => !hasB(b.id));
+  $('bList').innerHTML = BUILDINGS.map((b, i) => {
+    const built = hasB(b.id), can = i === next && temple.wallet >= b.cost;
+    const btn = built ? `<span class="done">${t('built')}</span>` : i === next ? `<button class="btn gold-btn mini" data-b="${b.id}" ${can ? '' : 'disabled'}>${t('donate')}</button>` : `<span class="lock">${t('inOrder')}</span>`;
+    return `<div class="bld ${built ? 'is-built' : ''}"><div class="bn"><b>${t('bName')[i]}</b><small>¥${b.cost.toLocaleString()}</small><span>${t('bEff')[i]}</span></div>${btn}</div>`;
+  }).join('');
+  $('bList').querySelectorAll('[data-b]').forEach((el) => el.addEventListener('click', () => {
+    const b = BUILDINGS.find((x) => x.id === el.dataset.b);
+    if (!b || temple.wallet < b.cost) return;
+    temple.wallet -= b.cost; temple.built.push(b.id); store.set('temple', temple);
+    world.setBuilt(temple.built); audio.gong(); flash(0.4); vib([30, 40, 60]);
+    renderTemple();
+  }));
+  $('skinList').innerHTML = SKINS.map((k, i) => {
+    const ok = skinUnlocked(k);
+    return `<button class="btn round skin ${k === skin ? 'sel' : ''}" data-s="${k}" ${ok ? '' : 'disabled'}>${ok ? t('skins')[i] : '🔒 ' + t('skins')[i]}</button>`;
+  }).join('');
+  $('skinList').querySelectorAll('[data-s]').forEach((el) => el.addEventListener('click', () => {
+    if (!skinUnlocked(el.dataset.s)) return;
+    skin = el.dataset.s; store.set('skin', skin); setModel(1); renderTemple();
+  }));
+}
+world.setBuilt(temple.built);
 $('howBtn').addEventListener('click', () => { audio.init(); show('how', true); });
 $('howClose').addEventListener('click', () => show('how', false));
 $('soundBtn').addEventListener('click', () => { audio.init(); toggleSound(); });
@@ -380,6 +434,7 @@ function startGame() {
   clearWorldObjects();
   G = newGameState();
   G.rec = []; G.recT = 0;
+  G.perk = perks(); G.charms = G.perk.charms;
   ghostRun = store.get('ghost', null);
   setModel(1);
   resetMotes(G.camY);
@@ -613,7 +668,7 @@ function update(dt) {
   if (G.launch > 0) {
     G.launch -= dt;
     if (G.launch > 0) return;
-    G.v = 32; G.launchedAt = G.time; G.surge = 1.6; G.fovKick += 8; G.shake = 0.3;
+    G.v = 32; G.launchedAt = G.time; G.rocket = G.perk.start / UNIT_M; G.surge = 1.6; G.fovKick += 8; G.shake = 0.3;
     audio.stomp(); flash(0.15);
     shockwave(G.bx, G.by - 0.7, 0xfff0c0, 8);
     emit(G.bx, G.by - 0.7, 0, 0xffe0a0, 60, 6, 0.9);
@@ -636,6 +691,7 @@ function update(dt) {
   if (G.anti > 0) { if (!(G.diving > 0)) up += G.antiA; G.anti -= dt; } // 硬貨を吸った直後の逆重力（急降下中は効かない）
   if (G.gori > 0) up += 22 * Math.min(1, G.gori / 1.5);     // 御利益コイン：しばらく逆重力が続く
   if (G.dai > 0) up += 32;                                   // 大仏：強い浮力
+  if (G.rocket > 0) { up += 80; G.rocket -= Math.max(0, G.v) / UNIT_M * dt; if (G.rocket <= 0) { audio.gong(); flash(0.3); } } // 寄進の力で一気に駆け上がる
   const drag = PHYS.drag * G.v * Math.abs(G.v);              // 空気抵抗（落下にも上昇にも上限が生まれる）
   G.v += (up - PHYS.g * Math.sqrt(hardness()) - drag) * dt; // 高いほど重力が強い
   G.by += (G.v / UNIT_M) * dt;
@@ -697,7 +753,7 @@ function update(dt) {
   mouthW.set(G.bx, G.by + 2.7 * S, -0.2);           // 吸い込み口は頭上
   const tx = G.bx, ty = G.by + 2.7 * S;
   const cx = G.bx, cy = ty + R * 0.75;          // 吸引範囲は仏像の上に伸びる
-  const rx = Math.min(R * 0.25, 1.15) + (G.gori > 0 ? 0.8 : 0) + (G.dai > 0 ? 6 : 0), ry = R * 1.4; // 真上の細い柱だけを吸う // 横幅は細く：左右に動いて狙う
+  const rx = Math.min(R * 0.25, 1.15) * G.perk.suck + (G.gori > 0 ? 0.8 : 0) + (G.dai > 0 ? 6 : 0), ry = R * 1.4; // 真上の細い柱だけを吸う // 横幅は細く：左右に動いて狙う
   G.suck = { cx, cy, rx, ry, tx, ty };
   const bvy = G.v / UNIT_M;
   const damp = Math.pow(0.02, dt);
@@ -768,7 +824,8 @@ function update(dt) {
       if (cd < hitR) { // 当たり判定は見た目より少し小さく
         // 仏像の下側で当たった＝上から踏みつけた（下から来るカラスは胸の高さまでなら踏める）
         const stomp = f.y < G.by + (G.diving > 0 ? 1.1 : 0.45) * S; // 急降下中は踏みやすい
-        if (stomp || G.dai > 0) { // 無敵なのは大仏変身中だけ
+        if (G.inv > 0) continue; // お守りが砕けた直後は無敵
+        if (stomp || G.dai > 0 || G.rocket > 0) { // 無敵なのは大仏変身中（と寄進の駆け上がり中）だけ
           // 撃ち落として、仏像はジャンプ（3秒以内に続けて踏むと連鎖で跳ねる力が増す）
           f.dead = true; f.vy = -4; f.vx = (f.x - G.bx) * 2 + (Math.random() - 0.5) * 2;
           G.chain = G.time - (G.lastStomp ?? -9) < 3 ? (G.chain || 0) + 1 : 1; G.lastStomp = G.time;
@@ -785,6 +842,13 @@ function update(dt) {
           continue;
         }
         // 横や下からぶつかったら即アウト（激突の演出のあと結果へ）
+        if (G.charms > 0) { // お守りが砕けて身代わりになる
+          G.charms--; G.inv = 1.6;
+          f.dead = true; f.vy = 2; f.vx = Math.sign(f.x - G.bx || 1) * 8;
+          audio.chime(6); audio.hit(); flash(0.4); vib([40, 30, 40]); G.shake = 0.6;
+          shockwave(G.bx, G.by + 1, 0xa0e0ff, 7); emit(G.bx, G.by + 1, 0.4, 0xc0f0ff, 40, 6, 0.8);
+          continue;
+        }
         startDeath('crow', f); return;
       }
       if (f.y < G.camY - viewHalfH - 3) { scene.remove(f.obj); G.foes.splice(i, 1); continue; } // 通り過ぎたカラスは片付ける
@@ -836,7 +900,7 @@ function absorb(c) {
   // 速く昇っているときほど効きにくい（速度が暴走しないように）
   const k = (1 + Math.min(G.combo, 40) * 0.012) * (G.v < 0 ? 1.5 : THREE.MathUtils.clamp(1 - G.v / 60, 0.1, 1));
   const rest = G.anti > 0 ? G.antiA * G.anti : 0; // まだ残っている逆重力の分も足す
-  G.anti = 0.3; G.antiA = (rest + d.boost * k) / 0.3;
+  G.anti = 0.3; G.antiA = (rest + d.boost * k * G.perk.lift) / 0.3;
   G.thrust = Math.min(2.5, G.thrust + d.boost * 0.35 + 0.15);
   G.fovKick += Math.min(1.2, d.boost * 0.9);
   // 吸った瞬間に上へ：位置を押し上げ、仏像が跳ね、カメラは遅れて追う
@@ -936,6 +1000,7 @@ function gameOver(reason = '') {
   input.down = input.key = false;
   const prevBest = best.alt;
   saveBest();
+  temple.wallet += G.money; store.set('temple', temple); // 集めた賽銭はお寺の財布に貯まる
   if (Math.floor(G.maxAlt || altM()) > prevBest && G.rec && G.rec.length > 20) store.set('ghost', { alt: Math.floor(G.maxAlt || altM()), pts: G.rec });
   audio.over();
   const alt = Math.floor(G.maxAlt || altM());
@@ -947,7 +1012,7 @@ function gameOver(reason = '') {
   $('resAlt').textContent = alt.toLocaleString() + 'm';
   $('resMoney').textContent = G.money.toLocaleString();
   $('resRibbon').textContent = t('rankLabel', { r: rank(alt) });
-  $('resLines').innerHTML = [isBest ? `<b>${t('newBest')}</b>` : t('bestLine', { m: best.alt.toLocaleString() }), t('reached', { s: stageLabel(G.stage) })].join('<br>');
+  $('resLines').innerHTML = [isBest ? `<b>${t('newBest')}</b>` : t('bestLine', { m: best.alt.toLocaleString() }), t('toTemple', { a: G.money.toLocaleString(), w: temple.wallet.toLocaleString() })].join('<br>');
   $('resNext').textContent = t('again');
   show('result', true); show('hud', false);
 }
@@ -971,7 +1036,7 @@ function updateHUD() {
   setText('score', Math.floor(Math.max(G.maxAlt || 0, altM())).toLocaleString());
   setText('alt', Math.floor(altM()).toLocaleString());
   setText('speed', Math.max(0, Math.round(G.v)).toString());
-  setText('money', G.money.toLocaleString());
+  setText('money', G.money.toLocaleString() + (G.charms > 0 ? `  🛡${G.charms}` : ''));
   setText('formName', G.dai > 0 ? t('giant') : formLabel(form()));
   setText('goalLbl', G.stage < LAST ? `▲ ${Math.max(0, Math.ceil(st.start + st.goal - altM())).toLocaleString()}m` : (best.alt > altM() ? `👑 ${best.alt.toLocaleString()}m` : '👑'));
   const s = '';
@@ -996,7 +1061,8 @@ function frameVisuals(dt, t) {
     // タイトル：境内で硬貨を吸い込む仏像を、カメラがゆっくり回る
     titleT += dt;
     const lv = FORCE_LV || 1; // タイトルは木造仏から（確認用に ?lv=1〜5 で形態を指定できる）
-    if (!model || model.userData.lv !== lv) setModel(lv);
+    const want = skin !== 'buddha' ? skin : lv;
+    if (!model || model.userData.lv !== want) setModel(lv);
     by = 1.6; bx = 0; S = lv === 5 ? 1.35 : 1.1;
     buddhaRoot.position.set(0, by + Math.sin(t * 0.0015) * 0.15, 0);
     buddhaRoot.scale.setScalar(S);
