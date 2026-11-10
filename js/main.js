@@ -4,9 +4,9 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { buildBuddha, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611101900';
-import { World, UNIT_M, makeLightPillars } from './world.js?v=202611101900';
-import { AudioEngine } from './audio.js?v=202611101900';
+import { buildBuddha, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611101918';
+import { World, UNIT_M, makeLightPillars } from './world.js?v=202611101918';
+import { AudioEngine } from './audio.js?v=202611101918';
 
 const $ = (id) => document.getElementById(id);
 const store = {
@@ -52,6 +52,7 @@ try {
 }
 const isMobile = matchMedia('(pointer: coarse)').matches;
 // 確認用：URLに ?lv=1〜5 を付けると、タイトル画面にその形態の仏像を出す
+const ZOOM = Math.max(1, Math.min(3, parseFloat(new URLSearchParams(location.search).get('zoom')) || 1)); // 確認用：タイトルで仏像を拡大
 const FORCE_LV = Math.max(0, Math.min(5, parseInt(new URLSearchParams(location.search).get('lv'), 10) || 0));
 // 画質レベル（重ければ自動で下げる）：[解像度の上限, ブルームの有無]
 const QUALITY = [[1.75, true], [1.4, true], [1.15, true], [1.0, false], [0.8, false]];
@@ -838,8 +839,8 @@ function frameVisuals(dt, t) {
     buddhaRoot.rotation.set(0, Math.sin(titleT * 0.3) * 0.25, 0);
     const a = titleT * 0.12;
     camera.fov = 50; camera.updateProjectionMatrix();
-    camera.position.set(Math.sin(a) * 9, by + 1.2, 16 + Math.cos(a) * 2);
-    lookAt.set(0, by + 3.6, 0); camera.lookAt(lookAt);
+    camera.position.set(Math.sin(a) * 9 / ZOOM, by + 1.2 + (ZOOM - 1) * 0.6, (16 + Math.cos(a) * 2) / ZOOM);
+    lookAt.set(0, by + 3.6 - (ZOOM - 1) * 1.0, 0); camera.lookAt(lookAt);
     // 上に連なる硬貨が渦を巻いて口へ吸い込まれる
     if (titleCoins.length < 46 && Math.random() < 0.45) {
       const types = ['zeni', 'zeni', 'zeni', 'koban', 'zeni', 'goriyaku'];

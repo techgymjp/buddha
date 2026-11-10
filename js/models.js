@@ -118,11 +118,11 @@ woodTex.wrapS = woodTex.wrapT = THREE.RepeatWrapping;
 
 // 鎌倉の大仏：緑青の浮いた青銅（雨だれの筋とまだら）
 function drawPatina(g, w, h, bump) {
-  g.fillStyle = bump ? '#808080' : '#a2b6ab'; g.fillRect(0, 0, w, h);
-  speckle(g, w, h, 500, bump ? ['rgba(255,255,255,.08)', 'rgba(0,0,0,.08)'] : ['rgba(70,72,62,.22)', 'rgba(170,195,182,.3)', 'rgba(110,130,115,.25)', 'rgba(60,64,58,.18)'], 6, 30);
+  g.fillStyle = bump ? '#808080' : '#5f6f66'; g.fillRect(0, 0, w, h);
+  speckle(g, w, h, 500, bump ? ['rgba(255,255,255,.05)', 'rgba(0,0,0,.05)'] : ['rgba(50,54,48,.18)', 'rgba(140,165,152,.18)', 'rgba(95,112,100,.16)'], 8, 34);
   for (let i = 0; i < 140; i++) { // 雨だれの筋
     const x = Math.random() * w, y0 = Math.random() * h, len = 40 + Math.random() * 220;
-    g.strokeStyle = bump ? 'rgba(0,0,0,.06)' : (Math.random() < 0.5 ? 'rgba(55,60,52,.22)' : 'rgba(185,210,198,.22)');
+    g.strokeStyle = bump ? 'rgba(0,0,0,.04)' : (Math.random() < 0.5 ? 'rgba(40,44,38,.2)' : 'rgba(165,190,178,.2)');
     g.lineWidth = 1 + Math.random() * 4;
     g.beginPath(); g.moveTo(x, y0); g.lineTo(x + (Math.random() - 0.5) * 6, y0 + len); g.stroke();
   }
@@ -134,7 +134,7 @@ const stoneTex = canvasTex(256, 256, (g, w, h) => { g.fillStyle = '#8d8a82'; g.f
 stoneTex.wrapS = stoneTex.wrapT = THREE.RepeatWrapping;
 
 export const MAT = {
-  patina: new THREE.MeshStandardMaterial({ map: patinaTex, bumpMap: patinaBump, bumpScale: 0.25, metalness: 0.25, roughness: 0.55, envMapIntensity: 1.0, emissive: 0x18221e, emissiveIntensity: 0.6 }),
+  patina: new THREE.MeshStandardMaterial({ map: patinaTex, bumpMap: patinaBump, bumpScale: 0.15, metalness: 0, roughness: 0.88, envMapIntensity: 0.35, emissive: 0x161c18, emissiveIntensity: 0.6 }),
   stone: new THREE.MeshStandardMaterial({ map: stoneTex, color: 0xd8d4cc, roughness: 0.95 }),
   wood: new THREE.MeshStandardMaterial({ color: 0xffe2b8, map: woodTex, roughness: 0.55, metalness: 0, bumpMap: woodTex, bumpScale: 0.6, envMapIntensity: 0.5 }),
   woodDark: new THREE.MeshStandardMaterial({ color: 0xb98a55, map: woodTex, roughness: 0.7 }),
@@ -207,6 +207,41 @@ function boatHaloGeometry(h, wdt, flames) {
   return g;
 }
 
+// 鎌倉の大仏の体：裾の広い三角形のシルエット。腕は衣に包まれ、袖が膝へ流れ落ちる
+function buildKamakuraBody(body, mat) {
+  // 幅広く組んだ脚
+  blob(mat, 0, 0.2, 0.12, 1.3, 0.3, 0.72, body);
+  for (const sx of [-1, 1]) blob(mat, sx * 0.9, 0.2, 0.28, 0.45, 0.28, 0.46, body);
+  for (let i = 0; i < 8; i++) { // 脚にかかる衣の放射状の襞
+    const x = -1.05 + i * 0.3;
+    const c = new THREE.CatmullRomCurve3([V(x * 0.45, 0.46, 0.62), V(x * 0.8, 0.3, 0.8), V(x, 0.1, 0.86)]);
+    body.add(new THREE.Mesh(new THREE.TubeGeometry(c, 12, 0.03, 6), mat));
+  }
+  // 胴：裾広がり（腕も衣に包まれて一体）
+  const prof = [[0, 0.3], [0.98, 0.32], [1.02, 0.46], [0.94, 0.72], [0.84, 1.0], [0.8, 1.25], [0.72, 1.45], [0.5, 1.63], [0.22, 1.73], [0, 1.75]].map(([r, y]) => new THREE.Vector2(r, y));
+  const torso = new THREE.Mesh(new THREE.LatheGeometry(prof, 48), mat); torso.scale.set(1, 1, 0.62); body.add(torso);
+  // なで肩から膝へ流れ落ちる大きな袖
+  for (const sx of [-1, 1]) {
+    blob(mat, sx * 0.64, 1.44, 0, 0.36, 0.25, 0.34, body);
+    capsule(mat, V(sx * 0.76, 1.38, 0.04), V(sx * 0.9, 0.55, 0.32), 0.27, body);
+    for (let i = 0; i < 4; i++) { // 袖の縦の襞
+      const c = new THREE.CatmullRomCurve3([V(sx * (0.62 + i * 0.09), 1.5, 0.22), V(sx * (0.8 + i * 0.07), 1.0, 0.38), V(sx * (0.92 + i * 0.05), 0.5, 0.5)]);
+      body.add(new THREE.Mesh(new THREE.TubeGeometry(c, 16, 0.026, 6), mat));
+    }
+    capsule(mat, V(sx * 0.85, 0.55, 0.42), V(sx * 0.28, 0.52, 0.62), 0.14, body); // 袖から出る前腕
+  }
+  // 開いた胸元と、両肩から垂れるU字の深い襞
+  blob(mat, 0, 1.2, 0.3, 0.44, 0.4, 0.18, body);
+  for (let i = 0; i < 7; i++) {
+    const dy = i * 0.1, w = 0.56 - i * 0.03;
+    const c = new THREE.CatmullRomCurve3([V(-w - 0.06, 1.55 - dy * 0.25, 0.2), V(-w * 0.55, 1.22 - dy, 0.42), V(0, 1.02 - dy * 1.2, 0.5), V(w * 0.55, 1.22 - dy, 0.42), V(w + 0.06, 1.55 - dy * 0.25, 0.2)]);
+    body.add(new THREE.Mesh(new THREE.TubeGeometry(c, 30, 0.05, 8), mat));
+  }
+  // 腹の前で組む定印
+  blob(mat, 0, 0.55, 0.66, 0.42, 0.1, 0.22, body);
+  const th = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.03, 6, 16), mat); th.position.set(0, 0.66, 0.72); th.rotation.x = 0.4; body.add(th);
+}
+
 /**
  * 仏像を組み立てる
  * lv: 1木造仏 2黒漆 3光背巨大化 4鎌倉の大仏 5黄金の奈良の大仏
@@ -220,6 +255,7 @@ export function buildBuddha(lv) {
 
   // --- 蓮台 ---
   const ped = new THREE.Group(); body.add(ped);
+  if (lv === 4) ped.scale.set(1.35, 0.8, 1.2); // 鎌倉の大仏：広く低い石の台座
   const petalMat = lv === 1 ? MAT.wood : lv === 5 ? MAT.goldGreat : lv === 2 ? MAT.gold : lv === 4 ? MAT.stone : MAT.lotus;
   // [枚数, 半径, 高さ, 外への傾き]
   const tiers = lv === 5 ? [[16, 1.05, -0.12, 0.6], [16, 0.97, -0.3, 0.9], [16, 0.86, -0.48, 1.2]] : [[18, 0.9, -0.05, 0.55], [18, 0.84, -0.22, 0.95], [14, 0.72, -0.38, 1.25]];
@@ -237,6 +273,7 @@ export function buildBuddha(lv) {
   const ring = new THREE.Mesh(new THREE.TorusGeometry(0.66, 0.035, 8, 40), baseMat); ring.rotation.x = Math.PI / 2; ring.position.y = -0.42; ped.add(ring);
 
   // --- 脚（結跏趺坐） ---
+  if (lv !== 4) {
   blob(mat, 0, 0.18, 0.12, 0.95, 0.24, 0.55, body);
   blob(mat, -0.62, 0.17, 0.3, 0.34, 0.22, 0.34, body);
   blob(mat, 0.62, 0.17, 0.3, 0.34, 0.22, 0.34, body);
@@ -254,6 +291,7 @@ export function buildBuddha(lv) {
   torso.scale.set(1, 1, 0.68); body.add(torso);
   blob(mat, -0.52, 1.36, -0.02, 0.27, 0.25, 0.27, body); // 肩
   blob(mat, 0.52, 1.36, -0.02, 0.27, 0.25, 0.27, body);
+  }
   // 衣の縁（袈裟）
   const drape = new THREE.CatmullRomCurve3([V(-0.5, 1.5, 0.12), V(-0.15, 1.2, 0.42), V(0.2, 0.8, 0.44), V(0.5, 0.55, 0.35)]);
   if (lv !== 4) body.add(new THREE.Mesh(new THREE.TubeGeometry(drape, 30, 0.045, 8), mat));
@@ -281,6 +319,8 @@ export function buildBuddha(lv) {
     capsule(mat, V(-0.62, 1.3, 0), V(-0.74, 0.74, 0.18), 0.13, body);
     capsule(mat, V(-0.74, 0.74, 0.18), V(-0.62, 0.46, 0.52), 0.11, body);
     blob(mat, -0.6, 0.42, 0.62, 0.14, 0.05, 0.2, body);                      // 膝の上で上に向けた手のひら
+  } else if (lv === 4) {
+    buildKamakuraBody(body, mat);
   } else {
     capsule(mat, V(-0.62, 1.3, 0), V(-0.68, 0.72, 0.18), 0.13, body);
     capsule(mat, V(0.62, 1.3, 0), V(0.68, 0.72, 0.18), 0.13, body);
@@ -291,15 +331,21 @@ export function buildBuddha(lv) {
   }
 
   // --- 首・頭 ---
-  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.2, 0.25, 20), mat); neck.position.y = 1.74; body.add(neck);
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(lv === 4 ? 0.22 : 0.17, lv === 4 ? 0.26 : 0.2, 0.25, 20), mat); neck.position.y = 1.74; body.add(neck);
   for (let i = 0; i < 3; i++) { const t = new THREE.Mesh(new THREE.TorusGeometry(0.18 + i * 0.008, 0.012, 6, 24), mat); t.rotation.x = Math.PI / 2; t.position.y = 1.68 + i * 0.06; body.add(t); }
   const head = new THREE.Group(); head.position.set(0, 2.12, 0); body.add(head);
+  if (lv === 4) { head.position.set(0, 2.06, 0.06); head.scale.set(1.2, 1.26, 1.18); head.rotation.x = 0.16; } // 鎌倉の大仏：大きな頭でうつむき加減
   blob(mat, 0, 0, 0, 0.4, 0.46, 0.42, head);
   blob(mat, 0, -0.24, 0.08, 0.3, 0.22, 0.3, head); // 頬〜顎
   // 耳（長い耳たぶ）
   for (const sx of [-1, 1]) {
-    blob(mat, sx * 0.41, -0.06, -0.02, 0.07, 0.3, 0.13, head, 0, 0, sx * 0.08);
-    blob(mat, sx * 0.43, -0.3, 0.0, 0.06, 0.1, 0.08, head);
+    if (lv === 4) { // 肩近くまで届く長い耳たぶ
+      blob(mat, sx * 0.41, -0.16, -0.02, 0.07, 0.4, 0.13, head, 0, 0, sx * 0.06);
+      blob(mat, sx * 0.43, -0.5, 0.0, 0.065, 0.13, 0.09, head);
+    } else {
+      blob(mat, sx * 0.41, -0.06, -0.02, 0.07, 0.3, 0.13, head, 0, 0, sx * 0.08);
+      blob(mat, sx * 0.43, -0.3, 0.0, 0.06, 0.1, 0.08, head);
+    }
   }
   // 顔
   const face = new THREE.Group(); face.position.set(0, 0, 0.36); head.add(face);
@@ -315,7 +361,7 @@ export function buildBuddha(lv) {
   const lipU = blob(mat, 0, -0.245, 0.055, 0.075, 0.022, 0.03, face);
   const lipL = blob(mat, 0, -0.29, 0.05, 0.065, 0.026, 0.03, face);
   const mouth = blob(MAT.dark, 0, -0.265, 0.045, 0.06, 0.006, 0.02, face);
-  const urna = blob(MAT.urna, 0, 0.17, 0.05, 0.025, 0.025, 0.025, face);
+  const urna = blob(lv === 4 ? mat : MAT.urna, 0, 0.17, 0.05, 0.03, 0.03, 0.03, face);
 
   // 螺髪・肉髻
   if (false) {
@@ -330,9 +376,15 @@ export function buildBuddha(lv) {
     }
     blob(MAT.gold, 0, 0.38, 0, 0.11, 0.13, 0.11, crown);
   } else {
-    curls(head, hairMat, 0, 0.04, 0, 0.42, 520, 0.12, 0.05);
-    curls(head, hairMat, 0, 0.5, -0.03, 0.22, 110, -0.6, 0.045);
-    blob(hairMat, 0, 0.48, -0.03, 0.21, 0.2, 0.21, head);
+    if (lv === 4) { // 小粒で密な螺髪と低い肉髻
+      curls(head, hairMat, 0, 0.04, 0, 0.42, 900, 0.1, 0.036);
+      curls(head, hairMat, 0, 0.4, -0.02, 0.24, 160, -0.3, 0.032);
+      blob(hairMat, 0, 0.4, -0.02, 0.23, 0.13, 0.23, head);
+    } else {
+      curls(head, hairMat, 0, 0.04, 0, 0.42, 520, 0.12, 0.05);
+      curls(head, hairMat, 0, 0.5, -0.03, 0.22, 110, -0.6, 0.045);
+      blob(hairMat, 0, 0.48, -0.03, 0.21, 0.2, 0.21, head);
+    }
   }
 
   // --- 光背 ---
@@ -394,23 +446,6 @@ export function buildBuddha(lv) {
       }
     }
     glowSize = lv >= 5 ? 7 : lv >= 3 ? 5 : 3.2;
-  }
-
-  // 鎌倉の大仏：両肩から胸元へU字に垂れる衣の襞、広い肩と大きな袖
-  if (lv === 4) {
-    for (let i = 0; i < 6; i++) {
-      const dy = i * 0.11, w = 0.5 - i * 0.03;
-      const c = new THREE.CatmullRomCurve3([V(-w - 0.05, 1.5 - dy * 0.3, 0.18), V(-w * 0.55, 1.2 - dy, 0.4), V(0, 1.02 - dy * 1.15, 0.47), V(w * 0.55, 1.2 - dy, 0.4), V(w + 0.05, 1.5 - dy * 0.3, 0.18)]);
-      body.add(new THREE.Mesh(new THREE.TubeGeometry(c, 30, 0.045, 8), mat));
-    }
-    for (const sx of [-1, 1]) {
-      blob(mat, sx * 0.62, 1.15, 0.05, 0.3, 0.42, 0.32, body);            // 大きな袖
-      for (let i = 0; i < 4; i++) { // 袖の縦の襞
-        const c = new THREE.CatmullRomCurve3([V(sx * (0.5 + i * 0.07), 1.45, 0.2), V(sx * (0.62 + i * 0.06), 1.0, 0.3), V(sx * (0.7 + i * 0.04), 0.6, 0.3)]);
-        body.add(new THREE.Mesh(new THREE.TubeGeometry(c, 16, 0.022, 6), mat));
-      }
-    }
-    body.scale.set(1.12, 1, 1.08); // どっしりした体つき
   }
 
   // 後光の輝き（加算スプライト）
