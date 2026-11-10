@@ -4,10 +4,10 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { buildBuddha, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611102027';
-import { World, UNIT_M, makeLightPillars } from './world.js?v=202611102027';
-import { t, lang, setLang, applyStatic } from './i18n.js?v=202611102027';
-import { AudioEngine } from './audio.js?v=202611102027';
+import { buildBuddha, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611102034';
+import { World, UNIT_M, makeLightPillars } from './world.js?v=202611102034';
+import { t, lang, setLang, applyStatic } from './i18n.js?v=202611102034';
+import { AudioEngine } from './audio.js?v=202611102034';
 
 const $ = (id) => document.getElementById(id);
 const store = {
@@ -105,6 +105,19 @@ audio.preload((k) => { $('startBtn').textContent = t('loading', { p: Math.round(
   $('startBtn').disabled = false; $('startBtn').textContent = t('start');
 });
 
+// ---------- 振動（音をオフにしているときは震えない） ----------
+let lastVib = 0;
+function vib(pattern, minGap = 0) {
+  try {
+    const now = performance.now();
+    if (audio.muted || !navigator.vibrate || now - lastVib < minGap) return;
+    lastVib = now; navigator.vibrate(pattern);
+  } catch (e) { /* 振動できない端末は何もしない */ }
+}
+// ---------- スローモーション（ニアミスの演出） ----------
+let timeScale = 1, slowT = 0;
+function slowmo(sec, scale = 0.3) { slowT = Math.max(slowT, sec); timeScale = scale; }
+
 // ---------- 仏像 ----------
 const buddhaRoot = new THREE.Group(); scene.add(buddhaRoot);
 const modelCache = {};
@@ -116,6 +129,11 @@ function setModel(lv) {
   buddhaRoot.add(model);
 }
 setModel(1);
+const ghostMat = new THREE.MeshBasicMaterial({ color: 0xbfe6ff, transparent: true, opacity: 0.28, depthWrite: false });
+const ghost = buildBuddha(1);
+ghost.traverse((o) => { if (o.isMesh || o.isInstancedMesh) o.material = ghostMat; if (o.isSprite) o.visible = false; });
+ghost.visible = false; scene.add(ghost);
+let ghostRun = null; // { alt, pts: [x0, y0, x1, y1, ...] } 0.1秒ごと
 const aura = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture, color: 0xffc860, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.4 }));
 aura.position.set(0, 1.2, -0.3); buddhaRoot.add(aura);
 // 吸い上げの渦（仏像の真下に伸びる黄金の竜巻）
@@ -252,21 +270,28 @@ let flashV = 0;
 function flash(v) { flashV = Math.max(flashV, v); }
 
 // ---------- 入力：押すと吸引／離すと停止、押したまま左右スワイプで移動 ----------
-const input = { down: false, lastX: 0, dragPx: 0, left: false, right: false, key: false };
+const input = { down: false, lastX: 0, dragPx: 0, left: false, right: false, key: false, dive: false, sy: 0, st: 0, diveUsed: false };
 const canvas = $('c');
 canvas.addEventListener('pointerdown', (e) => {
   audio.init();
   if (state !== 'play') return;
-  input.down = true; input.lastX = e.clientX;
+  input.down = true; input.lastX = e.clientX; input.sy = e.clientY; input.st = performance.now(); input.diveUsed = false;
   try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
 });
-canvas.addEventListener('pointermove', (e) => { if (input.down) { input.dragPx += e.clientX - input.lastX; input.lastX = e.clientX; } });
+canvas.addEventListener('pointermove', (e) => {
+  if (!input.down) return;
+  input.dragPx += e.clientX - input.lastX; input.lastX = e.clientX;
+  // すばやく下にスワイプしたら急降下
+  if (!input.diveUsed && e.clientY - input.sy > 32 && performance.now() - input.st < 350) { input.dive = true; input.diveUsed = true; }
+  if (performance.now() - input.st > 350) { input.sy = e.clientY; input.st = performance.now(); input.diveUsed = false; } // 長いドラッグ中も何度でも
+});
 const release = () => { input.down = false; };
 canvas.addEventListener('pointerup', release); canvas.addEventListener('pointercancel', release);
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 window.addEventListener('keydown', (e) => {
   const k = e.key;
   if (k === 'ArrowLeft' || k === 'a' || k === 'A') input.left = true;
+  if ((k === 'ArrowDown' || k === 's' || k === 'S') && !e.repeat) { e.preventDefault(); input.dive = true; }
   if (k === 'ArrowRight' || k === 'd' || k === 'D') input.right = true;
   if (k === ' ') { e.preventDefault(); audio.init(); }
   if (k === 'Enter' && !e.repeat) { audio.init(); if (state === 'title' && audio.ready) startGame(); else if (state === 'result') $('resNext').click(); }
@@ -299,6 +324,38 @@ $('pauseBtn').addEventListener('click', togglePause);
 $('resumeBtn').addEventListener('click', togglePause);
 $('quitBtn').addEventListener('click', () => { show('pause', false); toTitle(); });
 $('resTitleBtn').addEventListener('click', toTitle);
+$('shareBtn').addEventListener('click', () => shareRecord());
+// 結果を1枚の画像にしてシェア（使えなければ保存）
+async function shareRecord() {
+  composer.render();
+  const shot = renderer.domElement.toDataURL('image/jpeg', 0.9);
+  const img = await new Promise((res) => { const im = new Image(); im.onload = () => res(im); im.src = shot; });
+  const W = 720, H = 1280, c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  const sc = Math.max(W / img.width, H / img.height);
+  g.drawImage(img, (W - img.width * sc) / 2, (H - img.height * sc) / 2, img.width * sc, img.height * sc);
+  const grd = g.createLinearGradient(0, 0, 0, H);
+  grd.addColorStop(0, 'rgba(20,8,2,.75)'); grd.addColorStop(0.35, 'rgba(20,8,2,.15)'); grd.addColorStop(0.62, 'rgba(20,8,2,.2)'); grd.addColorStop(1, 'rgba(20,8,2,.88)');
+  g.fillStyle = grd; g.fillRect(0, 0, W, H);
+  const gold = (y0, y1) => { const gg = g.createLinearGradient(0, y0, 0, y1); gg.addColorStop(0, '#fffbe0'); gg.addColorStop(0.45, '#ffd34a'); gg.addColorStop(0.6, '#e07a10'); gg.addColorStop(1, '#ffe9a0'); return gg; };
+  const font = (px) => `${px}px "Dela Gothic One", "Hiragino Sans", sans-serif`;
+  const txt = (s, y, px, fill, stroke = '#3a1200') => { g.font = font(px); g.textAlign = 'center'; g.lineWidth = px * 0.14; g.strokeStyle = stroke; g.lineJoin = 'round'; g.strokeText(s, W / 2, y); g.fillStyle = fill; g.fillText(s, W / 2, y); };
+  txt(t('logo1') + (lang === 'en' ? ' ' : '') + t('logo2'), 120, lang === 'en' ? 70 : 84, gold(60, 130));
+  const alt = Math.floor(G.maxAlt || altM());
+  txt(t('resAlt'), 900, 34, '#ffe2a0');
+  txt(`${alt.toLocaleString()}m`, 1010, 112, gold(910, 1020));
+  txt(t('rankLabel', { r: rank(alt) }), 1085, 44, '#ffffff');
+  txt(`${formLabel(form())}  ·  ¥${G.money.toLocaleString()}`, 1150, 32, '#ffe9c0');
+  txt(location.host + location.pathname.replace(/index\.html$/, ''), 1230, 26, '#ffd890');
+  const blob = await new Promise((res) => c.toBlob(res, 'image/png'));
+  const file = new File([blob], 'flying-buddha.png', { type: 'image/png' });
+  const text = t('shareText', { m: alt.toLocaleString(), r: rank(alt) });
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], text, url: location.href.split('?')[0] }); return; }
+  } catch (e) { if (e && e.name === 'AbortError') return; }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'flying-buddha.png'; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
 $('resNext').addEventListener('click', () => {
   show('result', false); startGame();
 });
@@ -322,6 +379,8 @@ function newGameState() {
 function startGame() {
   clearWorldObjects();
   G = newGameState();
+  G.rec = []; G.recT = 0;
+  ghostRun = store.get('ghost', null);
   setModel(1);
   resetMotes(G.camY);
   show('title', false); show('hud', true);
@@ -394,7 +453,7 @@ function newSegment(P) {
   else if (r < 0.48) { P.mode = 'cross'; P.left = 6 + (Math.random() * 4 | 0); } // 反対側の車線へ斜めに渡る
   else if (r < 0.62) { P.mode = 'helix'; P.left = 8 + (Math.random() * 6 | 0); }
   else if (r < 0.76) { P.mode = 'zigzag'; P.left = 10 + (Math.random() * 6 | 0); P.tx = -P.side * LANE; }
-  else if (r < 0.9) { P.mode = 'branch'; P.left = 8 + (Math.random() * 5 | 0); P.good = Math.random() < 0.5 ? -1 : 1; P.cx = 0; }
+  else if (r < 0.9) { P.mode = 'branch'; P.left = 12 + (Math.random() * 6 | 0); P.good = Math.random() < 0.5 ? -1 : 1; P.cx = 0; P.bn = 0; }
   else if (G.time > 4) { P.mode = 'gap'; P.left = 1 + (Math.random() * 2 | 0) + (G.stage >> 1); }
   else { P.mode = 'wave'; P.left = 8; P.amp = 1; P.freq = 0.4; }
 }
@@ -409,9 +468,26 @@ function placeCrows(limitY) {
     G.nextCrowY += THREE.MathUtils.clamp(-Math.log(1 - Math.random()) * gap, 2.5, gap * 3.5);
     if (G.fever || !STAGES[G.stage].foes.includes('crow')) continue;
     // その高度が画面に入ってきたら、画面の端から飛び始めて横切る
-    const obj = makeCrow(); obj.scale.setScalar(1.3); obj.visible = false; scene.add(obj);
-    G.foes.push({ kind: 'crow', obj, x: 0, y, vx: 0, vy: 0, waiting: true, speed: (1.8 + Math.random() * 1.4 + G.stage * 0.2) * Math.sqrt(hardness()), bob: 0.25 + Math.random() * 0.3, t: Math.random() * 6, r: 0.5 });
+    const golden = Math.random() < 0.05 + G.stage * 0.015; // まれに八咫烏（踏めば大仏に変身）
+    const obj = golden ? makeGoldenCrow() : makeCrow(); obj.scale.setScalar(1.3); obj.visible = false; scene.add(obj);
+    G.foes.push({ kind: 'crow', golden, obj, x: 0, y, vx: 0, vy: 0, waiting: true, speed: (1.8 + Math.random() * 1.4 + G.stage * 0.2) * Math.sqrt(hardness()), bob: 0.25 + Math.random() * 0.3, t: Math.random() * 6, r: 0.5 });
   }
+}
+function makeGoldenCrow() {
+  const c = makeCrow();
+  c.traverse((o) => { if (o.isMesh) o.material = GOLD_CROW_MAT; });
+  const g = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture, color: 0xffd060, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false }));
+  g.scale.set(2.4, 2.4, 1); c.add(g);
+  return c;
+}
+const GOLD_CROW_MAT = new THREE.MeshPhysicalMaterial({ color: 0xffc040, metalness: 1, roughness: 0.25, emissive: 0x7a4a00, emissiveIntensity: 0.8, side: THREE.DoubleSide });
+// 分かれ道の儲かる道を行き来するカラス
+function addLaneCrow(side, y) {
+  const obj = makeCrow(); obj.scale.setScalar(1.3); scene.add(obj);
+  const cx = side * LANE, x = cx + (Math.random() - 0.5) * 2;
+  const vx = (Math.random() < 0.5 ? -1 : 1) * (1.4 + Math.random());
+  obj.position.set(x, y, 0.3); obj.rotation.y = vx > 0 ? 0 : Math.PI;
+  G.foes.push({ kind: 'crow', obj, x, y, vx, vy: 0, cx, range: 1.7, patrol: true, bob: 0.25, t: Math.random() * 6, r: 0.5 });
 }
 function extendPath(limitY) {
   placeCrows(limitY);
@@ -436,14 +512,17 @@ function extendPath(limitY) {
       for (const off of [-1.4, 0, 1.4]) addCoin(Math.random() < 0.14 ? 'koban' : 'zeni', P.x + off, P.y + (Math.random() - 0.5) * 0.3);
       continue;
     }
-    if (P.mode === 'branch') { // 分かれ道：片方は小判まじり
+    if (P.mode === 'branch') { // 分かれ道：儲かる道（小判とカラス）と安全な道
       const spread = Math.min(LANE, (P.left < 3 ? P.left : 3) * 1.3);
       for (const side of [-1, 1]) {
         const good = side === P.good;
         const x = P.x + side * spread;
-        const type = good ? (P.n % 3 === 0 ? 'koban' : 'zeni') : 'zeni'; // 分かれ道：片方は小判まじり
+        // 儲かる道は小判だらけ、安全な道は銅銭だけ
+        const type = good ? (P.n % 2 === 0 ? 'koban' : 'zeni') : 'zeni';
         addCoin(type, x, P.y);
       }
+      // 儲かる道にはカラスが行き来している
+      if (spread >= LANE - 0.01 && (P.bn = (P.bn || 0) + 1) % 4 === 2 && STAGES[G.stage].foes.includes('crow')) addLaneCrow(P.good, P.y + STEP * 0.5);
       continue;
     }
     let type = 'zeni';
@@ -541,9 +620,20 @@ function update(dt) {
     emit(G.bx, G.by - 0.8, 0, 0xd8c8a0, 30, 4, 0.8, 4);
   }
 
+  // ゴースト用に0.1秒ごとの位置を記録
+  G.recT += dt;
+  while (G.recT >= 0.1) { G.recT -= 0.1; if (G.rec.length < 12000) G.rec.push(+G.bx.toFixed(2), +G.by.toFixed(2)); }
+
+  // 急降下：下のカラスを踏みに行く（落ちすぎれば画面の下でアウト）
+  if (input.dive) {
+    input.dive = false;
+    if (!(G.diving > 0) && G.v > -30) { G.diving = 0.8; G.v = Math.min(G.v, -34); audio.dive(); vib(15); G.fovKick += 3; G.shake = Math.max(G.shake, 0.15); }
+  }
+  if (G.diving > 0) { G.diving -= dt; G.v = Math.min(G.v, -34); }
+
   // 物理：重力と、硬貨で得る逆重力（上向きの力）、空気抵抗
   let up = 0;
-  if (G.anti > 0) { up += G.antiA; G.anti -= dt; }           // 硬貨を吸った直後の逆重力
+  if (G.anti > 0) { if (!(G.diving > 0)) up += G.antiA; G.anti -= dt; } // 硬貨を吸った直後の逆重力（急降下中は効かない）
   if (G.gori > 0) up += 22 * Math.min(1, G.gori / 1.5);     // 御利益コイン：しばらく逆重力が続く
   if (G.dai > 0) up += 32;                                   // 大仏：強い浮力
   const drag = PHYS.drag * G.v * Math.abs(G.v);              // 空気抵抗（落下にも上昇にも上限が生まれる）
@@ -592,7 +682,7 @@ function update(dt) {
   // カメラは仏像の実際の高度を追う：上昇はしっかり追い、落下はゆっくりしか追わない
   const camTarget = G.by + 1.4;
   if (camTarget > G.camY) G.camY += (camTarget - G.camY) * Math.min(1, dt * 6);
-  else G.camY = Math.max(camTarget, G.camY - PHYS.camDown * dt);
+  else G.camY = Math.max(camTarget, G.camY - (G.diving > 0 ? 6 : PHYS.camDown) * dt);
   // 地面に落ちる、または画面の下まで落ちたらアウト
   G.danger = THREE.MathUtils.clamp(1 - (G.by - (G.camY - viewHalfH)) / 5, 0, 1);
   if (G.by < G.camY - viewHalfH + 0.6 || (G.by < 0.2 && G.v < 0)) { startDeath('fall'); return; }
@@ -662,22 +752,36 @@ function update(dt) {
         f.obj.visible = true; f.obj.rotation.y = dir > 0 ? 0 : Math.PI;
       }
       f.x += f.vx * dt; f.y += Math.sin(f.t * 3) * f.bob * dt; // 一定の高度をまっすぐ横切る
-      if (Math.abs(f.x) > XB + 5) { scene.remove(f.obj); G.foes.splice(i, 1); continue; } // 反対側へ抜けた
+      if (f.patrol) { if (Math.abs(f.x - f.cx) > f.range) { f.x = f.cx + Math.sign(f.x - f.cx) * f.range; f.vx = -f.vx; f.obj.rotation.y = f.vx > 0 ? 0 : Math.PI; } }
+      else if (Math.abs(f.x) > XB + 5) { scene.remove(f.obj); G.foes.splice(i, 1); continue; } // 反対側へ抜けた
       f.obj.position.set(f.x, f.y, 0.3);
       const flap = Math.sin(f.t * 16) * 0.9;
       f.obj.userData.wings[0].rotation.x = -flap; f.obj.userData.wings[1].rotation.x = flap;
-      if (Math.hypot(G.bx - f.x, G.by + 0.7 * S - f.y) < 0.55 * S + f.r * 0.7) { // 当たり判定は見た目より少し小さく
+      const cd = Math.hypot(G.bx - f.x, G.by + 0.7 * S - f.y), hitR = 0.55 * S + f.r * 0.7;
+      // ニアミス：ぎりぎりですれ違ったら、一瞬スローになって鈴が鳴り、少し浮力をもらう
+      if (!f.near && cd < hitR + 1.0) f.minD = Math.min(f.minD ?? 99, cd);
+      if (!f.near && f.minD != null && cd > f.minD + 0.35) {
+        f.near = true;
+        slowmo(0.45, 0.3); audio.chime(4); G.v = Math.max(G.v, 0) + 5; G.surge = Math.max(G.surge || 0, 0.8);
+        emit(G.bx, G.by + 1.2 * S, 0.4, 0xfff6c0, 16, 3, 0.5); vib(15);
+      }
+      if (cd < hitR) { // 当たり判定は見た目より少し小さく
         // 仏像の下側で当たった＝上から踏みつけた（下から来るカラスは胸の高さまでなら踏める）
-        const stomp = f.y < G.by + 0.45 * S;
+        const stomp = f.y < G.by + (G.diving > 0 ? 1.1 : 0.45) * S; // 急降下中は踏みやすい
         if (stomp || G.dai > 0) { // 無敵なのは大仏変身中だけ
-          // 撃ち落として、仏像はジャンプ（浮力を得る）
+          // 撃ち落として、仏像はジャンプ（3秒以内に続けて踏むと連鎖で跳ねる力が増す）
           f.dead = true; f.vy = -4; f.vx = (f.x - G.bx) * 2 + (Math.random() - 0.5) * 2;
-          G.v = Math.max(-G.v * 0.6, 0) + 20; G.surge = 1.6; // 反発してジャンプ G.fovKick += 6; G.shake = 0.35; G.score += 300;
+          G.chain = G.time - (G.lastStomp ?? -9) < 3 ? (G.chain || 0) + 1 : 1; G.lastStomp = G.time;
+          const ch = Math.min(G.chain, 7);
+          const dive = G.diving > 0; G.diving = 0;
+          G.v = 20 + (ch - 1) * 7 + (dive ? 8 : 0);
+          G.surge = 1.6; G.fovKick += 5 + ch * 1.5; G.shake = 0.3 + ch * 0.06; G.score += 300 * ch;
           G.combo++; G.comboT = 0.85; G.stomps = (G.stomps || 0) + 1;
-          audio.stomp(); flash(0.12);
-          emit(f.x, f.y, 0, 0x2a2a33, 22, 5, 0.9, 6);           // 羽根が散る
-          emit(G.bx, G.by - 0.6 * S, 0, 0xffe6a0, 18, 4, 0.5);   // 踏み台の光
-          shockwave(G.bx, G.by - 0.5 * S, 0xfff0c0, 4);
+          audio.stomp(ch); flash(0.1 + ch * 0.04); vib(25 + ch * 8);
+          emit(f.x, f.y, 0, f.golden ? 0xffe070 : 0x2a2a33, 22, 5, 0.9, 6);   // 羽根が散る
+          emit(G.bx, G.by - 0.6 * S, 0, 0xffe6a0, 14 + ch * 6, 3 + ch, 0.5);    // 踏み台の光
+          shockwave(G.bx, G.by - 0.5 * S, ch >= 3 ? 0xfff6c0 : 0xfff0c0, 3 + ch * 1.5);
+          if (f.golden && G.dai <= 0) henshin(); // 八咫烏を踏むと大仏に変身
           continue;
         }
         // 横や下からぶつかったら即アウト（激突の演出のあと結果へ）
@@ -743,16 +847,16 @@ function absorb(c) {
   inhale(4 + Math.round(d.boost * 2), 1.4 + d.boost * 0.2 * S);
   if (G.fever) { G.feverCount++; if (G.feverCount === HENSHIN_NEED && G.dai <= 0) henshin(); }
   if (c.type === 'koban') {
-    audio.koban(); G.fovKick += 4; G.shake = Math.max(G.shake, 0.15);
+    audio.koban(); vib(20); G.fovKick += 4; G.shake = Math.max(G.shake, 0.15);
     inhale(30, 3.2, 0xffe066);
     inhaleRing(4.5, 0xffe08a);
   } else if (c.type === 'goriyaku') {
-    audio.goriyaku(); G.gori = 3.5; G.v = Math.max(G.v, 0) + 10; flash(0.5); G.fovKick += 16; G.shake = 0.5; G.lift = Math.min(2.8, G.lift + 1.5); G.surge = 1.6;
+    audio.goriyaku(); vib([30, 30, 60]); G.gori = 3.5; G.v = Math.max(G.v, 0) + 10; flash(0.5); G.fovKick += 16; G.shake = 0.5; G.lift = Math.min(2.8, G.lift + 1.5); G.surge = 1.6;
     banner('御利益！', '');
     inhale(70, 5, 0xfff2a0);
     inhaleRing(8, 0xfff2b0); setTimeout(() => G && inhaleRing(5, 0xfff2b0), 150);
   } else {
-    audio.coin(Math.min(25, G.combo));
+    audio.coin(Math.min(25, G.combo)); vib(6, 60);
     if (G.combo % 5 === 0) { // 5連続ごと：光の輪が吸い込まれ、鈴が鳴る
       const lv = Math.min(6, G.combo / 5);
       inhaleRing(2.5 + lv * 0.8, lv >= 4 ? 0xfff6d0 : 0xffe08a);
@@ -789,7 +893,7 @@ function startDeath(kind, crow) {
   G.death = { t: 0, kind, crow };
   G.spin = 0;
   if (kind === 'crow') {
-    audio.crowHit(); flash(0.6); G.shake = 1.4; G.danger = 1;
+    audio.crowHit(); flash(0.6); G.shake = 1.4; G.danger = 1; vib([80, 40, 140]);
     emit(crow.x, crow.y, 0.3, 0x18181e, 40, 7, 1.4, 5);        // 黒い羽根が飛び散る
     emit(crow.x, crow.y, 0.3, 0xffffff, 16, 9, 0.35);          // 衝撃の火花
     shockwave(crow.x, crow.y, 0xff6050, 5);
@@ -797,7 +901,7 @@ function startDeath(kind, crow) {
     crow.vx = Math.sign(crow.vx || 1) * 9; crow.flee = true;    // カラスは飛び去る
     G.death.fallSound = false;
   } else {
-    audio.fall(); G.danger = 1; G.death.fallSound = true;
+    audio.fall(); G.danger = 1; G.death.fallSound = true; vib([40, 60, 40]);
   }
 }
 function updateDying(dt) {
@@ -832,6 +936,7 @@ function gameOver(reason = '') {
   input.down = input.key = false;
   const prevBest = best.alt;
   saveBest();
+  if (Math.floor(G.maxAlt || altM()) > prevBest && G.rec && G.rec.length > 20) store.set('ghost', { alt: Math.floor(G.maxAlt || altM()), pts: G.rec });
   audio.over();
   const alt = Math.floor(G.maxAlt || altM());
   const isBest = alt > prevBest;
@@ -1070,7 +1175,20 @@ function loop(now) {
   const dt = Math.min(0.05, rawDt);
   last = now;
   adaptQuality(Math.min(0.2, rawDt));
-  if (G && state === 'play') { update(dt); }
+  if (slowT > 0) { slowT -= dt; if (slowT <= 0) timeScale = 1; }
+  const gdt = state === 'play' ? dt * timeScale : dt;
+  if (G && state === 'play') { update(gdt); }
+  // ゴースト：最高記録のプレイの動きを半透明の仏像で再生
+  ghost.visible = false;
+  if (G && (state === 'play' || state === 'dying') && ghostRun && G.launch <= 0) {
+    const k = (G.time - G.launchedAt) / 0.1, i = Math.floor(k) * 2, P = ghostRun.pts;
+    if (i + 3 < P.length) {
+      const u = k - Math.floor(k);
+      ghost.position.set(P[i] + (P[i + 2] - P[i]) * u, P[i + 1] + (P[i + 3] - P[i + 1]) * u, -0.6);
+      ghost.scale.setScalar(1);
+      ghost.visible = Math.abs(ghost.position.y - G.camY) < viewHalfH + 4;
+    }
+  }
   if (G && state === 'dying') updateDying(dt);
   if (G && state === 'play') updateHUD();
   if (G && state === 'result') { // 結果画面では仏像の周りをゆっくり回る
@@ -1081,7 +1199,7 @@ function loop(now) {
     if (resultKind === 'end') buddhaRoot.scale.setScalar(2.1);
     world.update(altM(), camera.position, now);
     audio.setWind(0);
-  } else if (state !== 'paused') frameVisuals(dt, now);
+  } else if (state !== 'paused') frameVisuals(state === 'play' ? gdt : dt, now);
   updateParts(dt);
   updateFloaters(dt);
   if (bannerT > 0) { bannerT -= dt; $('banner').style.opacity = Math.min(1, bannerT * 2); }

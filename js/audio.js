@@ -223,6 +223,7 @@ export class AudioEngine {
       level: [0.8, (c, d) => [523, 659, 784, 1047].forEach((f, i) => tone(c, d, 0.005 + i * 0.08, f, 0.3, 'triangle', 0.09))],
       henshin: [2.0, (c, d) => { [262, 330, 392, 523, 659, 784, 1047].forEach((f, i) => tone(c, d, 0.2 + i * 0.09, f, 0.6, 'triangle', 0.07)); noise(c, d, 0.005, 1.5, 200, 2500, 0.4); }],
       stomp: [0.7, (c, d) => { thump(c, d, 0.005, 1.2); tone(c, d, 0.005, 300, 0.25, 'square', 0.08, 900); noise(c, d, 0.02, 0.4, 300, 3000, 0.25); metal(c, d, 0.06, 2093, 0.18, 0.5); }],
+      dive: [0.6, (c, d) => { noise(c, d, 0.005, 0.5, 2600, 300, 0.4); tone(c, d, 0.005, 700, 0.4, 'sine', 0.12, -450); }],
       beat: [0.6, (c, d) => { thump(c, d, 0.005, 1.1); thump(c, d, 0.2, 0.8); }],
       crowHit: [1.2, (c, d) => { caw(c, d, 0.005, 1.05); caw(c, d, 0.36, 0.95); thump(c, d, 0.005, 1.4); noise(c, d, 0.005, 0.25, 2500, 400, 0.45); tone(c, d, 0.005, 180, 0.4, 'square', 0.08, -120); }],
       fall: [1.3, (c, d) => { tone(c, d, 0.005, 900, 1.1, 'sine', 0.18, -760); noise(c, d, 0.005, 1.2, 1800, 150, 0.25); }],
@@ -355,7 +356,8 @@ export class AudioEngine {
   over() { this.play('over'); }
   crowHit() { this.play('crowHit'); }
   fall() { this.play('fall'); }
-  stomp() { this.play('stomp'); }
+  stomp(ch = 1) { this.play('stomp', 1, { rate: Math.pow(2, Math.min(ch - 1, 7) / 12 * 2) }); } // 連鎖ほど高い音
+  dive() { this.play('dive'); }
   beat(k = 1) { this.play('beat', 0.5 + k * 0.6); }
   boost() { /* 小判・御利益の音に含めた */ }
   thump() { /* 小判・御利益の音に含めた */ }
