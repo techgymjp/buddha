@@ -4,9 +4,9 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { buildBuddha, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611101844';
-import { World, UNIT_M, makeLightPillars } from './world.js?v=202611101844';
-import { AudioEngine } from './audio.js?v=202611101844';
+import { buildBuddha, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611101846';
+import { World, UNIT_M, makeLightPillars } from './world.js?v=202611101846';
+import { AudioEngine } from './audio.js?v=202611101846';
 
 const $ = (id) => document.getElementById(id);
 const store = {
@@ -277,8 +277,8 @@ let state = 'title';
 let best = store.get('best', { score: 0, alt: 0 });
 const show = (id, on) => $(id).classList.toggle('hidden', !on);
 function refreshBest() {
-  $('bestTitle').textContent = best.score ? `ベストスコア ${best.score.toLocaleString()} ／ 最高到達 ${best.alt.toLocaleString()}m` : '';
-  $('bestHud').textContent = best.score.toLocaleString();
+  $('bestTitle').textContent = best.alt ? `最高到達 ${best.alt.toLocaleString()}m` : '';
+  $('bestHud').textContent = best.alt.toLocaleString();
 }
 refreshBest();
 $('startBtn').addEventListener('click', () => { if (!audio.ready) return; audio.init(); startGame(); });
@@ -291,8 +291,7 @@ $('resumeBtn').addEventListener('click', togglePause);
 $('quitBtn').addEventListener('click', () => { show('pause', false); toTitle(); });
 $('resTitleBtn').addEventListener('click', toTitle);
 $('resNext').addEventListener('click', () => {
-  show('result', false);
-  if (resultKind === 'clear') nextStage(); else startGame();
+  show('result', false); startGame();
 });
 
 function togglePause() {
@@ -330,7 +329,25 @@ function beginStage(i) {
   banner(`第${i + 1}天`, STAGES[i].name);
   audio.gong();
 }
-function nextStage() { show('hud', true); beginStage(G.stage + 1); }
+// 高度に応じたステージ（極楽浄土の先は終わりなく続く）
+const LAST = STAGES.length - 1;
+function stageAt(alt) { for (let i = 0; i < LAST; i++) if (alt < STAGES[i].start + STAGES[i].goal) return i; return LAST; }
+// 賽銭の嵐の区間（各ステージの終わり。最後のステージ以降は一定の高度ごと）
+function segmentAt(alt) {
+  const i = stageAt(alt);
+  if (i < LAST) return { start: STAGES[i].start, len: STAGES[i].goal, id: i };
+  const s0 = STAGES[LAST].start, len = STAGES[LAST].goal, n = Math.floor((alt - s0) / len);
+  return { start: s0 + n * len, len, id: LAST + n };
+}
+// 高度が上がると、止まらずにそのまま次のステージへ
+function enterStage(i) {
+  G.stage = i;
+  setModel(G.dai > 0 ? 5 : FORMS[G.form].lv);
+  $('stageName').textContent = `第${i + 1}天 ${STAGES[i].name}`;
+  world.refreshEnv(altM());
+  audio.gong(); flash(0.35);
+  shockwave(G.bx, G.by + 1, 0xfff0c0, 12);
+}
 function toTitle() {
   show('result', false); show('pause', false); show('hud', false); show('title', true);
   clearWorldObjects();
@@ -521,10 +538,16 @@ function update(dt) {
   G.by += (G.v / UNIT_M) * dt;
   G.score += Math.max(0, G.v) * dt * (G.dai > 0 ? 3 : 1) | 0;
 
-  // 段階の判定
-  const stageAlt = altM() - st.start;
-  if (stageAlt >= st.goal) { stageClear(); return; }
-  if (!G.fever && stageAlt >= st.goal * FEVER_AT) {
+  // 高度に応じてステージが変わる（戻りはしない）
+  const ns = stageAt(altM());
+  if (ns > G.stage) enterStage(ns);
+  // 賽銭の嵐：区間の終わりで起こり、次の区間に入ると収まる
+  const seg = segmentAt(altM());
+  if (G.segId !== seg.id) {
+    if (G.segId != null && seg.id > G.segId) { G.fever = false; G.feverCount = 0; G.dai = 0; setModel(FORMS[G.form].lv); }
+    G.segId = Math.max(G.segId ?? -1, seg.id);
+  }
+  if (!G.fever && altM() - seg.start >= seg.len * FEVER_AT && seg.id === G.segId) {
     G.fever = true;
     banner('賽銭の嵐！', `${HENSHIN_NEED}枚吸い込めば大仏に…！`);
     audio.koban();
@@ -744,46 +767,27 @@ function henshin() {
   shockwave(G.bx, G.by, 0xfff2b0, 16);
 }
 
-let resultKind = 'clear';
-function stageClear() {
-  state = 'result'; resultKind = 'clear';
-  input.down = input.key = false;
-  const bonus = Math.round(Math.max(0, G.v)) * 30 + (G.dai > 0 ? 3000 : 0);
-  G.score += bonus;
-  const last = G.stage + 1 >= STAGES.length;
-  saveBest();
-  audio.gong(); audio.level(); flash(0.4);
-  $('resTitle').textContent = last ? '成仏！' : 'ステージクリア！';
-  $('resAlt').textContent = Math.floor(altM()).toLocaleString() + 'm';
-  $('resMoney').textContent = G.money.toLocaleString();
-  $('resRibbon').textContent = G.dai > 0 ? '大仏変身ボーナス +3,000' : `第${G.stage + 1}天「${STAGES[G.stage].name}」踏破`;
-  $('resLines').innerHTML = [
-    `このステージの賽銭 <b>¥${G.stageMoney.toLocaleString()}</b>`,
-    `勢いボーナス <b>+${(Math.round(Math.max(0, G.v)) * 30).toLocaleString()}</b>`,
-    `仏像：<b>Lv.${form().lv} ${form().name}</b>`,
-    `スコア <b>${G.score.toLocaleString()}</b>`,
-    last ? `黄金の大仏は極楽浄土へ到達した<br>称号：<b>${rank(G.score)}</b>` : `次は「<b>${STAGES[G.stage + 1].name}</b>」へ`,
-  ].join('<br>');
-  $('resNext').textContent = last ? 'もう一度遊ぶ' : '次へ';
-  if (last) { resultKind = 'end'; setModel(5); G.dai = 1; }
-  show('result', true); show('hud', false);
-}
+let resultKind = 'over';
 function gameOver(reason = '') {
   state = 'result'; resultKind = 'over';
   input.down = input.key = false;
+  const prevBest = best.alt;
   saveBest();
   audio.over();
+  const alt = Math.floor(G.maxAlt || altM());
+  const isBest = alt > prevBest;
   $('resTitle').textContent = reason ? 'カラスに激突…' : '墜落…';
-  $('resAlt').textContent = Math.floor(G.maxAlt || altM()).toLocaleString() + 'm';
+  $('resAlt').textContent = alt.toLocaleString() + 'm';
   $('resMoney').textContent = G.money.toLocaleString();
-  $('resRibbon').textContent = `称号：${rank(G.score)}`;
-  $('resLines').innerHTML = [reason || `第${G.stage + 1}天「${STAGES[G.stage].name}」で力尽きた`, `スコア <b>${G.score.toLocaleString()}</b>　最大 <b>${G.maxCombo}</b> 連続`, `ベストスコア <b>${best.score.toLocaleString()}</b>`].join('<br>');
+  $('resRibbon').textContent = isBest ? '最高到達高度 更新！' : `称号：${rank(alt)}`;
+  $('resLines').innerHTML = [`到達：第${G.stage + 1}天「${STAGES[G.stage].name}」`, `称号：<b>${rank(alt)}</b>`, `最高到達 <b>${best.alt.toLocaleString()}m</b>`].join('<br>');
   $('resNext').textContent = 'もう一度遊ぶ';
   show('result', true); show('hud', false);
 }
-function rank(s) {
-  if (s >= 90000) return '如来'; if (s >= 50000) return '菩薩'; if (s >= 25000) return '明王';
-  if (s >= 10000) return '天部'; if (s >= 3000) return '修行僧'; return '煩悩まみれ';
+// 称号は到達高度で決まる
+function rank(alt) {
+  if (alt >= 9600) return '如来'; if (alt >= 7200) return '菩薩'; if (alt >= 5100) return '明王';
+  if (alt >= 3300) return '天部'; if (alt >= 1800) return '修行僧'; return '煩悩まみれ';
 }
 function saveBest() {
   const a = Math.floor(G.maxAlt || altM());
@@ -796,12 +800,12 @@ let hudCache = {};
 function setText(id, v) { if (hudCache[id] !== v) { hudCache[id] = v; $(id).textContent = v; } }
 function updateHUD() {
   const st = STAGES[G.stage];
-  setText('score', G.score.toLocaleString());
+  setText('score', Math.floor(Math.max(G.maxAlt || 0, altM())).toLocaleString());
   setText('alt', Math.floor(altM()).toLocaleString());
   setText('speed', Math.max(0, Math.round(G.v)).toString());
   setText('money', G.money.toLocaleString());
   setText('formName', G.dai > 0 ? '巨大大仏' : `Lv.${form().lv} ${form().name}`);
-  setText('goalLbl', `▲ ${Math.max(0, Math.ceil(st.start + st.goal - altM())).toLocaleString()}m`);
+  setText('goalLbl', G.stage < LAST ? `▲ ${Math.max(0, Math.ceil(st.start + st.goal - altM())).toLocaleString()}m` : (best.alt > altM() ? `👑 ${best.alt.toLocaleString()}m` : '👑'));
   const s = '';
   setText('status', s);
 }

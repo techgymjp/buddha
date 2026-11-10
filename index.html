@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Old+Mincho:wght@700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=202611101844">
+<link rel="stylesheet" href="style.css?v=202611101846">
 <script type="importmap">
 { "imports": { "three": "./vendor/three.module.min.js", "three/addons/": "./vendor/addons/" } }
 </script>
@@ -22,9 +22,9 @@
 <div id="hud" class="hidden">
   <div class="hud-row">
     <div class="plate left">
-      <div class="lbl">スコア</div>
+      <div class="lbl">最高高度</div>
       <div class="num gold" id="score">0</div>
-      <div class="sub">👑 ベスト <span id="bestHud">0</span></div>
+      <div class="sub">👑 ベスト <span id="bestHud">0</span>m</div>
     </div>
     <div class="stage-ribbon"><span id="stageName">第1天 地上の寺院</span></div>
     <div class="plate right">
@@ -86,13 +86,13 @@
 </section>
 
 <section id="result" class="screen hidden">
-  <div class="result-title" id="resTitle">ステージクリア！</div>
+  <div class="result-title" id="resTitle">墜落…</div>
   <div class="card">
     <div class="stat"><div class="lbl">到達高度</div><div class="val" id="resAlt">0m</div></div>
     <div class="stat"><div class="lbl">獲得した賽銭</div><div class="val"><i class="coin-ico"></i><span id="resMoney">0</span></div></div>
     <div class="ribbon" id="resRibbon">大仏変身ボーナス！</div>
     <div class="lines" id="resLines"></div>
-    <button class="btn gold-btn" id="resNext" type="button">次へ</button>
+    <button class="btn gold-btn" id="resNext" type="button">もう一度遊ぶ</button>
     <button class="btn blue-btn" id="resTitleBtn" type="button">タイトルに戻る</button>
   </div>
 </section>
@@ -109,6 +109,6 @@
 <div id="nogl" class="screen hidden"><div class="card"><h2 class="gold">WebGLが使えません</h2><p>このゲームは3D表示（WebGL）に対応したブラウザで遊べます。</p></div></div>
 
 </div>
-<script type="module" src="js/main.js?v=202611101844"></script>
+<script type="module" src="js/main.js?v=202611101846"></script>
 </body>
 </html>
