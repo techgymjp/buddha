@@ -4,10 +4,10 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { buildBuddha, buildSkin, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611102136';
-import { World, UNIT_M, makeLightPillars } from './world.js?v=202611102136';
-import { t, lang, setLang, applyStatic } from './i18n.js?v=202611102136';
-import { AudioEngine } from './audio.js?v=202611102136';
+import { buildBuddha, buildSkin, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611102330';
+import { World, UNIT_M, makeLightPillars } from './world.js?v=202611102330';
+import { t, lang, setLang, applyStatic } from './i18n.js?v=202611102330';
+import { AudioEngine } from './audio.js?v=202611102330';
 
 const $ = (id) => document.getElementById(id);
 const store = {
@@ -841,17 +841,14 @@ function update(dt) {
         continue;
       }
       if (f.waiting) { // まだ画面に入っていない高度のカラスは待機
-        if (f.y > G.camY + viewHalfH + 7) continue; // 画面に入る少し前から飛び始める
+        if (f.y > G.camY + viewHalfH + 3) continue; // 画面の天井のすぐ上（見えない所）から飛び始める
         const dir = Math.random() < 0.5 ? 1 : -1;
-        f.waiting = false; f.home = -dir; f.x = -dir * XB * Math.random(); f.vx = (Math.random() < 0.5 ? 1 : -1) * f.speed; // 画面の端〜中央のどこかに、すでに飛んでいる状態で現れる
+        f.waiting = false; f.x = (Math.random() * 2 - 1) * XB; f.vx = dir * f.speed; // 画面の上の外（見えない所）で、横幅のどこかをすでに飛んでいる → 速く昇ると画面の天井から降りてくるように見える
         f.obj.visible = true; f.obj.rotation.y = f.vx > 0 ? 0 : Math.PI;
       }
       f.x += f.vx * dt; f.y += Math.sin(f.t * 3) * f.bob * dt; // 一定の高度をまっすぐ横切る
       if (f.patrol) { if (Math.abs(f.x - f.cx) > f.range) { f.x = f.cx + Math.sign(f.x - f.cx) * f.range; f.vx = -f.vx; f.obj.rotation.y = f.vx > 0 ? 0 : Math.PI; } }
-      else { // 出てきた側の画面端から、画面の4分の3まで進んで折り返す（反対側の4分の1は空く）
-        const far = -f.home * XB * 0.5, near = f.home * (XB + 0.8);
-        if ((f.vx * -f.home > 0 && f.x * -f.home > far * -f.home) || (f.vx * f.home > 0 && f.x * f.home > near * f.home)) { f.vx = -f.vx; f.obj.rotation.y = f.vx > 0 ? 0 : Math.PI; }
-      }
+      else if (Math.abs(f.x) > XB + 2.5) { freeFoe(f); G.foes.splice(i, 1); continue; } // 折り返さず、画面の外へ飛び去る
       f.obj.position.set(f.x, f.y, 0.3);
       const flap = Math.sin(f.t * 16) * 0.9;
       f.obj.userData.wings[0].rotation.x = -flap; f.obj.userData.wings[1].rotation.x = flap;
