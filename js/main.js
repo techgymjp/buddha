@@ -4,9 +4,10 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { buildBuddha, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611101937';
-import { World, UNIT_M, makeLightPillars } from './world.js?v=202611101937';
-import { AudioEngine } from './audio.js?v=202611101937';
+import { buildBuddha, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611102004';
+import { World, UNIT_M, makeLightPillars } from './world.js?v=202611102004';
+import { t, lang, setLang, applyStatic } from './i18n.js?v=202611102004';
+import { AudioEngine } from './audio.js?v=202611102004';
 
 const $ = (id) => document.getElementById(id);
 const store = {
@@ -93,12 +94,15 @@ resize();
 const audio = new AudioEngine(store.get('muted', false));
 window.__audio = audio;
 function toggleSound() { audio.setMuted(!audio.muted); store.set('muted', audio.muted); updateSoundBtns(); }
-function updateSoundBtns() { for (const id of ['soundBtn', 'pauseSound']) $(id).textContent = audio.muted ? '× 音なし' : '♪ 音あり'; }
+function updateSoundBtns() { for (const id of ['soundBtn', 'pauseSound']) $(id).textContent = audio.muted ? t('soundOff') : t('soundOn'); }
+applyStatic();
+const stageLabel = (i) => t('stage', { n: i + 1, name: t('stages')[i] });
+const formLabel = (f) => `Lv.${f.lv} ${t('forms')[f.lv - 1]}`;
 updateSoundBtns();
 // 音はゲーム開始前にすべて作っておく（スマホで音が切れないように）
 $('startBtn').disabled = true;
-audio.preload((k) => { $('startBtn').textContent = `読み込み中 ${Math.round(k * 100)}%`; }).then(() => {
-  $('startBtn').disabled = false; $('startBtn').textContent = 'スタート';
+audio.preload((k) => { $('startBtn').textContent = t('loading', { p: Math.round(k * 100) }); }).then(() => {
+  $('startBtn').disabled = false; $('startBtn').textContent = t('start');
 });
 
 // ---------- 仏像 ----------
@@ -281,11 +285,12 @@ let state = 'title';
 let best = store.get('best', { score: 0, alt: 0 });
 const show = (id, on) => $(id).classList.toggle('hidden', !on);
 function refreshBest() {
-  $('bestTitle').textContent = best.alt ? `最高到達 ${best.alt.toLocaleString()}m` : '';
+  $('bestTitle').textContent = best.alt ? t('bestTitle', { m: best.alt.toLocaleString() }) : '';
   $('bestHud').textContent = best.alt.toLocaleString();
 }
 refreshBest();
 $('startBtn').addEventListener('click', () => { if (!audio.ready) return; audio.init(); startGame(); });
+$('langBtn').addEventListener('click', () => { setLang(lang === 'ja' ? 'en' : 'ja'); updateSoundBtns(); refreshBest(); if (audio.ready) $('startBtn').textContent = t('start'); hudCache = {}; });
 $('howBtn').addEventListener('click', () => { audio.init(); show('how', true); });
 $('howClose').addEventListener('click', () => show('how', false));
 $('soundBtn').addEventListener('click', () => { audio.init(); toggleSound(); });
@@ -328,7 +333,7 @@ function beginStage(i) {
   G.fever = false; G.feverCount = 0; G.stageMoney = 0; G.dai = 0; G.gori = 0; G.curse = 0;
   setModel(FORMS[G.form].lv);
   state = 'play';
-  $('stageName').textContent = `第${i + 1}天 ${STAGES[i].name}`;
+  $('stageName').textContent = stageLabel(i);
   world.refreshEnv(altM());
   banner(`第${i + 1}天`, STAGES[i].name);
   audio.gong();
@@ -347,7 +352,7 @@ function segmentAt(alt) {
 function enterStage(i) {
   G.stage = i;
   setModel(G.dai > 0 ? 5 : FORMS[G.form].lv);
-  $('stageName').textContent = `第${i + 1}天 ${STAGES[i].name}`;
+  $('stageName').textContent = stageLabel(i);
   world.refreshEnv(altM());
   audio.gong(); flash(0.35);
   shockwave(G.bx, G.by + 1, 0xfff0c0, 12);
@@ -823,18 +828,19 @@ function gameOver(reason = '') {
   audio.over();
   const alt = Math.floor(G.maxAlt || altM());
   const isBest = alt > prevBest;
-  $('resTitle').textContent = reason ? 'カラスに激突…' : '墜落…';
+  $('resTitle').textContent = reason ? t('crowHit') : t('fell');
   $('resAlt').textContent = alt.toLocaleString() + 'm';
   $('resMoney').textContent = G.money.toLocaleString();
-  $('resRibbon').textContent = isBest ? '最高到達高度 更新！' : `称号：${rank(alt)}`;
-  $('resLines').innerHTML = [`到達：第${G.stage + 1}天「${STAGES[G.stage].name}」`, `称号：<b>${rank(alt)}</b>`, `最高到達 <b>${best.alt.toLocaleString()}m</b>`].join('<br>');
-  $('resNext').textContent = 'もう一度遊ぶ';
+  $('resRibbon').textContent = isBest ? t('newBest') : t('rankLabel', { r: rank(alt) });
+  $('resLines').innerHTML = [t('reached', { s: stageLabel(G.stage) }), t('rankLabel', { r: `<b>${rank(alt)}</b>` }), t('bestLine', { m: best.alt.toLocaleString() })].join('<br>');
+  $('resNext').textContent = t('again');
   show('result', true); show('hud', false);
 }
 // 称号は到達高度で決まる
 function rank(alt) {
-  if (alt >= 9600) return '如来'; if (alt >= 7200) return '菩薩'; if (alt >= 5100) return '明王';
-  if (alt >= 3300) return '天部'; if (alt >= 1800) return '修行僧'; return '煩悩まみれ';
+  const R = t('ranks');
+  if (alt >= 9600) return R[5]; if (alt >= 7200) return R[4]; if (alt >= 5100) return R[3];
+  if (alt >= 3300) return R[2]; if (alt >= 1800) return R[1]; return R[0];
 }
 function saveBest() {
   const a = Math.floor(G.maxAlt || altM());
@@ -851,7 +857,7 @@ function updateHUD() {
   setText('alt', Math.floor(altM()).toLocaleString());
   setText('speed', Math.max(0, Math.round(G.v)).toString());
   setText('money', G.money.toLocaleString());
-  setText('formName', G.dai > 0 ? '巨大大仏' : `Lv.${form().lv} ${form().name}`);
+  setText('formName', G.dai > 0 ? t('giant') : formLabel(form()));
   setText('goalLbl', G.stage < LAST ? `▲ ${Math.max(0, Math.ceil(st.start + st.goal - altM())).toLocaleString()}m` : (best.alt > altM() ? `👑 ${best.alt.toLocaleString()}m` : '👑'));
   const s = '';
   setText('status', s);

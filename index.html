@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Old+Mincho:wght@700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=202611101937">
+<link rel="stylesheet" href="style.css?v=202611102004">
 <script type="importmap">
 { "imports": { "three": "./vendor/three.module.min.js", "three/addons/": "./vendor/addons/" } }
 </script>
@@ -22,15 +22,15 @@
 <div id="hud" class="hidden">
   <div class="hud-row">
     <div class="plate left">
-      <div class="lbl">最高高度</div>
+      <div class="lbl" data-i18n="hudMax">最高高度</div>
       <div class="num gold" id="score">0</div>
-      <div class="sub">👑 ベスト <span id="bestHud">0</span>m</div>
+      <div class="sub"><span data-i18n="hudBest">👑 ベスト</span> <span id="bestHud">0</span>m</div>
     </div>
     <div class="stage-ribbon"><span id="stageName">第1天 地上の寺院</span></div>
     <div class="plate right">
-      <div class="lbl">高度</div>
+      <div class="lbl" data-i18n="hudAlt">高度</div>
       <div class="num gold"><span id="alt">0</span><small>m</small></div>
-      <div class="sub">上昇 <b id="speed">0</b> m/s</div>
+      <div class="sub"><span data-i18n="hudRise">上昇</span> <b id="speed">0</b> m/s</div>
     </div>
   </div>
   <div class="hud-row second">
@@ -50,14 +50,15 @@
 <!-- タイトル -->
 <section id="title" class="screen">
   <div class="title-top">
-    <div class="catch">お金を吸い込め！<br>仏の力で天まで昇れ！</div>
-    <h1 class="logo"><span>空飛ぶ</span><span>仏像</span></h1>
+    <div class="catch" data-i18n-html="catch">お金を吸い込め！<br>仏の力で天まで昇れ！</div>
+    <h1 class="logo"><span data-i18n="logo1">空飛ぶ</span><span data-i18n="logo2">仏像</span></h1>
   </div>
   <div class="title-bottom">
     <button class="btn gold-btn big" id="startBtn" type="button">スタート</button>
     <div class="row">
-      <button class="btn round" id="howBtn" type="button">遊び方</button>
+      <button class="btn round" id="howBtn" type="button" data-i18n="howBtn">遊び方</button>
       <button class="btn round" id="soundBtn" type="button">♪ 音</button>
+      <button class="btn round" id="langBtn" type="button" data-i18n="langBtn">English</button>
     </div>
     <div class="best" id="bestTitle"></div>
   </div>
@@ -65,50 +66,44 @@
 
 <section id="how" class="screen hidden">
   <div class="card">
-    <h2 class="gold">遊び方</h2>
-    <ul class="rules">
-      <li>操作は<b>左右の移動だけ</b>（スワイプ／PCは ← →）。硬貨は<b>自動で吸い込む</b></li>
-      <li>上に連なる<b>硬貨の道をたどって</b>吸い込むほど加速して昇る</li>
-      <li>お金を吸うたびに<b>加速</b>。連続で吸うほど加速が強くなる</li>
-      <li>仏像には<b>重力</b>がかかり、硬貨を吸うと<b>逆重力</b>で押し上げられる。取らないと落ちていき、<b>画面の下まで落ちたらアウト</b></li>
-      <li><b>カラス</b>は決まった高さを横切って飛ぶ。落ちながら<b>上から踏みつける</b>と撃ち落としてジャンプ（浮力アップ）。下や横からぶつかると即アウト！</li>
-    </ul>
+    <h2 class="gold" data-i18n="howTitle">遊び方</h2>
+    <ul class="rules" id="rules"></ul>
     <div class="legend">
-      <div><i class="lg zeni"></i><b>銅銭</b>（天保通寳）<br>¥10・少し加速</div>
-      <div><i class="lg koban"></i><b>小判</b><br>¥300・大きく加速</div>
-      <div><i class="lg gori"></i><b>黄金の御利益コイン</b><br>加速度が増して超加速・吸引範囲アップ</div>
-      <div><i class="lg" style="background:radial-gradient(circle,#333,#111);box-shadow:inset 0 0 0 3px #000"></i><b>カラス</b><br>決まった高さを横切る。上から踏むと撃ち落としてジャンプ。下や横からぶつかると即アウト</div>
+      <div><i class="lg zeni"></i><span data-i18n-html="lgZeni"></span></div>
+      <div><i class="lg koban"></i><span data-i18n-html="lgKoban"></span></div>
+      <div><i class="lg gori"></i><span data-i18n-html="lgGori"></span></div>
+      <div><i class="lg" style="background:radial-gradient(circle,#333,#111);box-shadow:inset 0 0 0 3px #000"></i><span data-i18n-html="lgCrow"></span></div>
     </div>
-    <p class="evo-line">木造仏 → 黒漆の仏像 → 光背の巨大化 → 鎌倉の大仏 → 黄金の大仏</p>
-    <p class="evo-line">ステージ終盤の<b>賽銭の嵐</b>で14枚吸い込むと<b>巨大な大仏</b>に変身！</p>
-    <button class="btn gold-btn" id="howClose" type="button">閉じる</button>
+    <p class="evo-line" data-i18n="evo"></p>
+    <p class="evo-line" data-i18n-html="storm"></p>
+    <button class="btn gold-btn" id="howClose" type="button" data-i18n="close">閉じる</button>
   </div>
 </section>
 
 <section id="result" class="screen hidden">
   <div class="result-title" id="resTitle">墜落…</div>
   <div class="card">
-    <div class="stat"><div class="lbl">到達高度</div><div class="val" id="resAlt">0m</div></div>
-    <div class="stat"><div class="lbl">獲得した賽銭</div><div class="val"><i class="coin-ico"></i><span id="resMoney">0</span></div></div>
+    <div class="stat"><div class="lbl" data-i18n="resAlt">到達高度</div><div class="val" id="resAlt">0m</div></div>
+    <div class="stat"><div class="lbl" data-i18n="resMoney">獲得した賽銭</div><div class="val"><i class="coin-ico"></i><span id="resMoney">0</span></div></div>
     <div class="ribbon" id="resRibbon">大仏変身ボーナス！</div>
     <div class="lines" id="resLines"></div>
-    <button class="btn gold-btn" id="resNext" type="button">もう一度遊ぶ</button>
-    <button class="btn blue-btn" id="resTitleBtn" type="button">タイトルに戻る</button>
+    <button class="btn gold-btn" id="resNext" type="button" data-i18n="again">もう一度遊ぶ</button>
+    <button class="btn blue-btn" id="resTitleBtn" type="button" data-i18n="toTitle">タイトルに戻る</button>
   </div>
 </section>
 
 <section id="pause" class="screen hidden">
   <div class="card">
-    <h2 class="gold">一時停止</h2>
-    <button class="btn gold-btn" id="resumeBtn" type="button">再開</button>
+    <h2 class="gold" data-i18n="pause">一時停止</h2>
+    <button class="btn gold-btn" id="resumeBtn" type="button" data-i18n="resume">再開</button>
     <button class="btn round" id="pauseSound" type="button">♪ 音</button>
-    <button class="btn blue-btn" id="quitBtn" type="button">タイトルに戻る</button>
+    <button class="btn blue-btn" id="quitBtn" type="button" data-i18n="toTitle">タイトルに戻る</button>
   </div>
 </section>
 
-<div id="nogl" class="screen hidden"><div class="card"><h2 class="gold">WebGLが使えません</h2><p>このゲームは3D表示（WebGL）に対応したブラウザで遊べます。</p></div></div>
+<div id="nogl" class="screen hidden"><div class="card"><h2 class="gold" data-i18n="noglTitle">WebGLが使えません</h2><p data-i18n="noglText">このゲームは3D表示（WebGL）に対応したブラウザで遊べます。</p></div></div>
 
 </div>
-<script type="module" src="js/main.js?v=202611101937"></script>
+<script type="module" src="js/main.js?v=202611102004"></script>
 </body>
 </html>

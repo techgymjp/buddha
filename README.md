@@ -5,6 +5,7 @@
 仏像が賽銭・小判・硬貨を吸い込み、そのエネルギー（法力）で天へ昇っていく 3D ブラウザゲームです（スマホ・PC 両対応）。
 
 - 公開ページ：https://techgymjp.github.io/buddha/
+- 日本語 / English 対応（端末の言語で自動選択。タイトル画面のボタンか `?lang=en` / `?lang=ja` で切り替え）
 - ローカルで遊ぶ場合は ES モジュールを使うため、簡易サーバー経由で開いてください（例：`python3 -m http.server` → http://localhost:8000/）。
 
 ## 遊び方
@@ -84,4 +85,5 @@
 - `js/models.js` … 仏像（5形態）・硬貨・カラスの3Dモデルと質感（画像素材なし、テクスチャはプログラムで生成）
 - `js/world.js` … 空・光・雲・寺院・山・雲海・極楽浄土
 - `js/audio.js` … BGMと効果音の合成
+- `js/i18n.js` … 日本語 / English の文言
 - `vendor/` … [three.js](https://threejs.org/) r170（MIT ライセンス、`vendor/THREE_LICENSE`）
