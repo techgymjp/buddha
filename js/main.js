@@ -4,9 +4,9 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { buildBuddha, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611101924';
-import { World, UNIT_M, makeLightPillars } from './world.js?v=202611101924';
-import { AudioEngine } from './audio.js?v=202611101924';
+import { buildBuddha, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611101937';
+import { World, UNIT_M, makeLightPillars } from './world.js?v=202611101937';
+import { AudioEngine } from './audio.js?v=202611101937';
 
 const $ = (id) => document.getElementById(id);
 const store = {
@@ -31,13 +31,13 @@ const FORMS = [
   { lv: 5, name: '黄金の大仏', need: 85000, minStage: 3, scale: 1.35 },
 ];
 const COINS = {
-  zeni: { money: 10, r: 0.46, boost: 11, w: 70 },  // boost: 逆重力で得る速度（m/s）
-  koban: { money: 300, r: 0.6, boost: 18, w: 9 },
+  zeni: { money: 10, r: 0.46, boost: 18, w: 70 },  // boost: 逆重力で得る速度（m/s）
+  koban: { money: 300, r: 0.6, boost: 30, w: 9 },
   goriyaku: { money: 500, r: 0.45, boost: 16, w: 2.2 },
   noroi: { money: 0, r: 0.38, boost: -5, w: 0 },
 };
 // 物理の定数（m/s, m/s²）
-const PHYS = { g: 9.8, drag: 0.0042, camDown: 1.5 /* ユニット/秒 */ };
+const PHYS = { g: 16, drag: 0.0042, camDown: 1.5 /* ユニット/秒 */ }; // 重力は強め：取り逃すとすぐ落ちる
 const FEVER_AT = 0.82, HENSHIN_NEED = 14;
 const XB = 5.6;           // 左右の移動範囲
 const VIEW_H = 17.5, VIEW_W = 12;
@@ -399,7 +399,8 @@ function placeCrows(limitY) {
   if (G.nextCrowY == null) G.nextCrowY = G.by + 30; // 最初のカラスは十分上から
   while (G.nextCrowY < limitY) {
     const y = G.nextCrowY;
-    G.nextCrowY += CROW_GAP[G.stage] * (0.75 + Math.random() * 0.6);
+    // 間隔は指数分布：広い空白が続くことも、2羽が近い高さに続くこともある
+    G.nextCrowY += THREE.MathUtils.clamp(-Math.log(1 - Math.random()) * CROW_GAP[G.stage], 2.5, CROW_GAP[G.stage] * 3.5);
     if (G.fever || !STAGES[G.stage].foes.includes('crow')) continue;
     // その高度が画面に入ってきたら、画面の端から飛び始めて横切る
     const obj = makeCrow(); obj.scale.setScalar(1.3); obj.visible = false; scene.add(obj);
@@ -525,7 +526,7 @@ function update(dt) {
   if (G.launch > 0) {
     G.launch -= dt;
     if (G.launch > 0) return;
-    G.v = 26; G.launchedAt = G.time; G.surge = 1.6; G.fovKick += 8; G.shake = 0.3;
+    G.v = 32; G.launchedAt = G.time; G.surge = 1.6; G.fovKick += 8; G.shake = 0.3;
     audio.stomp(); flash(0.15);
     shockwave(G.bx, G.by - 0.7, 0xfff0c0, 8);
     emit(G.bx, G.by - 0.7, 0, 0xffe0a0, 60, 6, 0.9);
@@ -535,8 +536,8 @@ function update(dt) {
   // 物理：重力と、硬貨で得る逆重力（上向きの力）、空気抵抗
   let up = 0;
   if (G.anti > 0) { up += G.antiA; G.anti -= dt; }           // 硬貨を吸った直後の逆重力
-  if (G.gori > 0) up += 14 * Math.min(1, G.gori / 1.5);     // 御利益コイン：しばらく逆重力が続く
-  if (G.dai > 0) up += 22;                                   // 大仏：強い浮力
+  if (G.gori > 0) up += 22 * Math.min(1, G.gori / 1.5);     // 御利益コイン：しばらく逆重力が続く
+  if (G.dai > 0) up += 32;                                   // 大仏：強い浮力
   const drag = PHYS.drag * G.v * Math.abs(G.v);              // 空気抵抗（落下にも上昇にも上限が生まれる）
   G.v += (up - PHYS.g - drag) * dt;
   G.by += (G.v / UNIT_M) * dt;
@@ -659,7 +660,7 @@ function update(dt) {
         if (stomp || G.dai > 0 || G.gori > 0) {
           // 撃ち落として、仏像はジャンプ（浮力を得る）
           f.dead = true; f.vy = -4; f.vx = (f.x - G.bx) * 2 + (Math.random() - 0.5) * 2;
-          G.v = Math.max(-G.v * 0.6, 0) + 14; G.surge = 1.6; // 反発してジャンプ G.fovKick += 6; G.shake = 0.35; G.score += 300;
+          G.v = Math.max(-G.v * 0.6, 0) + 20; G.surge = 1.6; // 反発してジャンプ G.fovKick += 6; G.shake = 0.35; G.score += 300;
           G.combo++; G.comboT = 0.85; G.stomps = (G.stomps || 0) + 1;
           audio.stomp(); flash(0.12);
           emit(f.x, f.y, 0, 0x2a2a33, 22, 5, 0.9, 6);           // 羽根が散る
@@ -780,29 +781,39 @@ function startDeath(kind, crow) {
     emit(crow.x, crow.y, 0.3, 0x18181e, 40, 7, 1.4, 5);        // 黒い羽根が飛び散る
     emit(crow.x, crow.y, 0.3, 0xffffff, 16, 9, 0.35);          // 衝撃の火花
     shockwave(crow.x, crow.y, 0xff6050, 5);
-    G.v = -4; G.bvx = (G.bx - crow.x) * 6;                      // 弾き飛ばされる
-    crow.vx = Math.sign(crow.vx || 1) * 9; crow.flee = true;    // カラスは鳴きながら飛び去る
+    G.v = -8; G.bvx = (G.bx - crow.x) * 4;                      // 弾かれて落ち始める
+    crow.vx = Math.sign(crow.vx || 1) * 9; crow.flee = true;    // カラスは飛び去る
+    G.death.fallSound = false;
   } else {
-    audio.fall(); G.danger = 1;
+    audio.fall(); G.danger = 1; G.death.fallSound = true;
   }
 }
 function updateDying(dt) {
   const D = G.death; D.t += dt;
-  const slow = D.kind === 'crow' && D.t < 0.55 ? 0.25 : 1;     // 激突の瞬間はスローモーション
-  const sdt = dt * slow;
-  G.v = Math.max(-35, G.v - PHYS.g * sdt);
+  const stop = D.kind === 'crow' && D.t < 0.18;                 // ぶつかった瞬間のヒットストップ
+  const sdt = stop ? 0 : dt;
+  if (!stop && !D.fallSound) { D.fallSound = true; audio.fall(); }
+  G.v = Math.max(-45, G.v - PHYS.g * 1.3 * sdt);                // 真っ逆さまに墜落
   G.by += (G.v / UNIT_M) * sdt;
+  if (G.by < 0.25) { // 地面に落ちたら止まる
+    if (!D.landed) { D.landed = true; G.shake = 1; audio.hit(); emit(G.bx, 0, 0, 0xd8c8a0, 40, 5, 1, 4); }
+    G.by = 0.25; G.v = 0;
+  }
   G.bx += G.bvx * sdt; G.bvx *= Math.pow(0.3, sdt);
-  G.spin += sdt * (D.kind === 'crow' ? 9 : 4);                  // くるくる回って落ちる
+  G.spin = Math.min(1.9, G.spin + sdt * 1.6);                   // 前のめりに傾いていく
+  G.camY += (G.by + 2.5 - G.camY) * Math.min(1, dt * 3);        // カメラは落ちる仏像を追う
   G.shake *= Math.pow(0.2, dt);
-  G.danger = Math.max(0, 1 - D.t * 0.8);
+  G.danger = Math.max(0, 1 - D.t * 0.7);
+  if (!stop && parts.length < MAXP) { // 煙の尾
+    for (let k = 0; k < 3; k++) parts.push({ x: G.bx + (Math.random() - 0.5) * 0.8, y: G.by + 1.2 + Math.random(), z: (Math.random() - 0.5) * 0.6, vx: (Math.random() - 0.5) * 0.6, vy: G.v / UNIT_M * 0.3 + 1.5, vz: 0, life: 0.9, max: 0.9, r: 0.35, g: 0.33, b: 0.3, grav: 0 });
+  }
   const f = D.crow;
   if (f && f.obj) {
-    f.t += sdt; f.x += f.vx * sdt; f.y += 4 * sdt;
+    f.t += dt; f.x += f.vx * dt; f.y += 3 * dt;
     f.obj.position.set(f.x, f.y, 0.3); f.obj.rotation.y = f.vx > 0 ? 0 : Math.PI;
     const flap = Math.sin(f.t * 22) * 1.0; f.obj.userData.wings[0].rotation.x = -flap; f.obj.userData.wings[1].rotation.x = flap;
   }
-  if (D.t > (D.kind === 'crow' ? 1.7 : 1.1)) gameOver(D.kind === 'crow' ? 'カラスに当たった！' : '');
+  if (D.t > 1.8) gameOver(D.kind === 'crow' ? 'カラスに当たった！' : '');
 }
 function gameOver(reason = '') {
   state = 'result'; resultKind = 'over';
@@ -912,7 +923,7 @@ function frameVisuals(dt, t) {
   const yawTarget = THREE.MathUtils.clamp(G.bvx * 0.11, -1.1, 1.1);
   G.yaw = (G.yaw || 0) + (yawTarget - (G.yaw || 0)) * Math.min(1, dt * 6);
   buddhaRoot.rotation.set(-speed01 * 0.12 - G.thrust * 0.04, G.yaw, -G.yaw * 0.22);
-  if (state === 'dying') buddhaRoot.rotation.set(G.spin * 0.35, G.yaw, G.spin); // やられ：回転しながら落ちる
+  if (state === 'dying') buddhaRoot.rotation.set(G.spin * 0.7, G.yaw, G.spin * 0.25); // やられ：前のめりに傾いて墜落
   const ud = model.userData;
   ud.mouth.scale.set(0.06 + G.mouth * 0.03, 0.006 + G.mouth * 0.07, 0.02 + G.mouth * 0.02);
   ud.lipL.position.y = -0.29 - G.mouth * 0.04;
@@ -956,7 +967,7 @@ function frameVisuals(dt, t) {
   }
 
   // カメラ（速度で視野が広がる＝ドリーズーム）
-  const fov = state === 'dying' && G.death.kind === 'crow' && G.death.t < 0.8 ? 40 : 52 + speed01 * 24 + Math.min(20, G.fovKick) + G.thrust * 2.5;
+  const fov = state === 'dying' && G.death.kind === 'crow' && G.death.t < 0.3 ? 44 : 52 + speed01 * 24 + Math.min(20, G.fovKick) + G.thrust * 2.5;
   camera.fov += (fov - camera.fov) * Math.min(1, dt * 5);
   const tanH = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
   viewDist = Math.max(VIEW_H / 2 / tanH, VIEW_W / 2 / (tanH * camera.aspect));
