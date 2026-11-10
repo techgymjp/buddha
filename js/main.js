@@ -4,10 +4,10 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { buildBuddha, buildSkin, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611102039';
-import { World, UNIT_M, makeLightPillars } from './world.js?v=202611102039';
-import { t, lang, setLang, applyStatic } from './i18n.js?v=202611102039';
-import { AudioEngine } from './audio.js?v=202611102039';
+import { buildBuddha, buildSkin, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611102056';
+import { World, UNIT_M, makeLightPillars } from './world.js?v=202611102056';
+import { t, lang, setLang, applyStatic } from './i18n.js?v=202611102056';
+import { AudioEngine } from './audio.js?v=202611102056';
 
 const $ = (id) => document.getElementById(id);
 const store = {
@@ -102,6 +102,7 @@ updateSoundBtns();
 // 音はゲーム開始前にすべて作っておく（スマホで音が切れないように）
 $('startBtn').disabled = true;
 audio.preload((k) => { $('startBtn').textContent = t('loading', { p: Math.round(k * 100) }); }).then(() => {
+  warmUp();
   $('startBtn').disabled = false; $('startBtn').textContent = t('start');
 });
 
@@ -141,6 +142,27 @@ function perks() {
     charms: (hasB('lanterns') ? 1 : 0) + (hasB('daibutsuden') ? 1 : 0),   // お守り（カラスに耐える回数）
     start: hasB('pagoda') ? 800 : hasB('hondo') ? 300 : 0,                 // スタートの高さ（m）
   };
+}
+
+// ---------- 下準備：途中で初めて出る物を、ゲーム開始前に用意しておく ----------
+// （スマホでは、初めて描く物の準備に0.1〜0.3秒かかり、プレイ中だとカクッと止まるため）
+function warmUp() {
+  try {
+    const tmp = new THREE.Group(); scene.add(tmp);
+    for (let lv = 1; lv <= 5; lv++) { if (!modelCache[lv]) modelCache[lv] = buildBuddha(lv); }   // 進化する仏像を全部作っておく
+    if (skin !== 'buddha' && !modelCache[skin]) modelCache[skin] = buildSkin(skin);
+    const show = [...Object.values(modelCache).filter((m) => m !== model), ghost];
+    for (let i = 0; i < 2; i++) crowPool.n.push(getCrow(false)); crowPool.g.push(getCrow(true));
+    for (const tp of ['zeni', 'koban', 'goriyaku']) for (let i = 0; i < 4; i++) { const o = makeCoinMesh(tp); scene.add(o); o.visible = false; coinPool[tp].push(o); show.push(o); }
+    for (let i = 0; i < 6; i++) { const m = new THREE.Mesh(RING_OUT, new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false })); scene.add(m); m.visible = false; shockPool.push(m); show.push(m); }
+    for (const m of show) { if (!m.parent) tmp.add(m); m.visible = true; }
+    for (const o of [...crowPool.n, ...crowPool.g]) o.visible = true;
+    renderer.compile(scene, camera);                     // 描画プログラムをまとめて準備
+    for (const m of show) m.visible = false;
+    for (const o of [...crowPool.n, ...crowPool.g]) o.visible = false;
+    for (const m of Object.values(modelCache)) if (m.parent === tmp) tmp.remove(m);
+    ghost.visible = false; if (ghost.parent !== scene) scene.add(ghost);
+  } catch (e) { /* 下準備に失敗しても遊べる */ }
 }
 
 // ---------- 仏像 ----------
@@ -246,10 +268,14 @@ function resetLine(L, cy, h, anywhere) {
 lineData.forEach((L) => resetLine(L, 0, 20, true));
 
 // 衝撃波リング
-const shockwaves = [];
+const shockwaves = [], shockPool = [];
+const RING_OUT = new THREE.RingGeometry(0.7, 1, 64), RING_IN = new THREE.RingGeometry(0.86, 1, 64);
 function shockwave(x, y, color = 0xffe08a, size = 6, inward = false) {
-  const m = new THREE.Mesh(new THREE.RingGeometry(inward ? 0.86 : 0.7, 1, 64), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }));
-  m.position.set(x, y, inward ? 0.6 : 0); if (!inward) m.rotation.x = -Math.PI / 2 + 0.35; scene.add(m);
+  // 形と材質は使い回す（毎回作るとスマホで引っかかる）
+  let m = shockPool.pop();
+  if (!m) { m = new THREE.Mesh(RING_OUT, new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false })); scene.add(m); }
+  m.geometry = inward ? RING_IN : RING_OUT; m.material.color.set(color); m.visible = true;
+  m.position.set(x, y, inward ? 0.6 : 0); m.rotation.set(inward ? 0 : -Math.PI / 2 + 0.35, 0, 0);
   shockwaves.push({ m, t: 0, size, inward });
 }
 // 口へ吸い込まれる輪（大きな輪が口元へ縮む）
@@ -480,7 +506,7 @@ function toTitle() {
 function clearWorldObjects() {
   if (!G) return;
   for (const c of G.coins) freeCoin(c);
-  for (const f of G.foes) { scene.remove(f.obj); if (f.warn) f.warn.remove(); }
+  for (const f of G.foes) { freeFoe(f); if (f.warn) f.warn.remove(); }
 }
 
 // ---------- 生成：仏像の上に連なる硬貨の道 ----------
@@ -524,9 +550,20 @@ function placeCrows(limitY) {
     if (G.fever || !STAGES[G.stage].foes.includes('crow')) continue;
     // その高度が画面に入ってきたら、画面の端から飛び始めて横切る
     const golden = Math.random() < 0.05 + G.stage * 0.015; // まれに八咫烏（踏めば大仏に変身）
-    const obj = golden ? makeGoldenCrow() : makeCrow(); obj.scale.setScalar(1.3); obj.visible = false; scene.add(obj);
+    const obj = getCrow(golden); obj.visible = false;
     G.foes.push({ kind: 'crow', golden, obj, x: 0, y, vx: 0, vy: 0, waiting: true, speed: (1.8 + Math.random() * 1.4 + G.stage * 0.2) * Math.sqrt(hardness()), bob: 0.25 + Math.random() * 0.3, t: Math.random() * 6, r: 0.5 });
   }
+}
+const crowPool = { n: [], g: [] };
+function getCrow(golden) {
+  let o = crowPool[golden ? 'g' : 'n'].pop();
+  if (!o) { o = golden ? makeGoldenCrow() : makeCrow(); o.scale.setScalar(1.3); scene.add(o); }
+  o.rotation.set(0, 0, 0); o.visible = true; o.userData.golden = !!golden;
+  return o;
+}
+function freeFoe(f) {
+  if (f.kind === 'crow') { f.obj.visible = false; crowPool[f.obj.userData.golden ? 'g' : 'n'].push(f.obj); }
+  else scene.remove(f.obj);
 }
 function makeGoldenCrow() {
   const c = makeCrow();
@@ -538,7 +575,7 @@ function makeGoldenCrow() {
 const GOLD_CROW_MAT = new THREE.MeshPhysicalMaterial({ color: 0xffc040, metalness: 1, roughness: 0.25, emissive: 0x7a4a00, emissiveIntensity: 0.8, side: THREE.DoubleSide });
 // 分かれ道の儲かる道を行き来するカラス
 function addLaneCrow(side, y) {
-  const obj = makeCrow(); obj.scale.setScalar(1.3); scene.add(obj);
+  const obj = getCrow(false);
   const cx = side * LANE, x = cx + (Math.random() - 0.5) * 2;
   const vx = (Math.random() < 0.5 ? -1 : 1) * (1.4 + Math.random());
   obj.position.set(x, y, 0.3); obj.rotation.y = vx > 0 ? 0 : Math.PI;
@@ -798,7 +835,7 @@ function update(dt) {
       if (f.dead) { // 撃ち落とされたカラスはくるくる回って落ちる
         f.vy -= 30 * dt; f.x += f.vx * dt; f.y += f.vy * dt;
         f.obj.position.set(f.x, f.y, 0.3); f.obj.rotation.z += dt * 12; f.obj.rotation.x += dt * 5;
-        if (f.y < G.camY - viewHalfH - 4) { scene.remove(f.obj); G.foes.splice(i, 1); }
+        if (f.y < G.camY - viewHalfH - 4) { freeFoe(f); G.foes.splice(i, 1); }
         continue;
       }
       if (f.waiting) { // まだ画面に入っていない高度のカラスは待機
@@ -809,7 +846,7 @@ function update(dt) {
       }
       f.x += f.vx * dt; f.y += Math.sin(f.t * 3) * f.bob * dt; // 一定の高度をまっすぐ横切る
       if (f.patrol) { if (Math.abs(f.x - f.cx) > f.range) { f.x = f.cx + Math.sign(f.x - f.cx) * f.range; f.vx = -f.vx; f.obj.rotation.y = f.vx > 0 ? 0 : Math.PI; } }
-      else if (Math.abs(f.x) > XB + 5) { scene.remove(f.obj); G.foes.splice(i, 1); continue; } // 反対側へ抜けた
+      else if (Math.abs(f.x) > XB + 5) { freeFoe(f); G.foes.splice(i, 1); continue; } // 反対側へ抜けた
       f.obj.position.set(f.x, f.y, 0.3);
       const flap = Math.sin(f.t * 16) * 0.9;
       f.obj.userData.wings[0].rotation.x = -flap; f.obj.userData.wings[1].rotation.x = flap;
@@ -851,7 +888,7 @@ function update(dt) {
         }
         startDeath('crow', f); return;
       }
-      if (f.y < G.camY - viewHalfH - 3) { scene.remove(f.obj); G.foes.splice(i, 1); continue; } // 通り過ぎたカラスは片付ける
+      if (f.y < G.camY - viewHalfH - 3) { freeFoe(f); G.foes.splice(i, 1); continue; } // 通り過ぎたカラスは片付ける
     } else {
       f.x += f.vx * dt; if (Math.abs(f.x) > XB) f.vx *= -1;
       f.obj.position.x = f.x;
@@ -864,7 +901,7 @@ function update(dt) {
         if (Math.abs(G.bx - f.x) < 0.6 + 0.4 * S && G.by < f.y && G.by > f.y - 24) hurt(10, '落雷！ 失速');
       }
       if (!striking) { f.struck = false; f.bolt.visible = false; }
-      if (f.y < G.camY - viewHalfH - 8) { scene.remove(f.obj); G.foes.splice(i, 1); continue; }
+      if (f.y < G.camY - viewHalfH - 8) { freeFoe(f); G.foes.splice(i, 1); continue; }
     }
   }
 
@@ -920,7 +957,7 @@ function absorb(c) {
     inhale(70, 5, 0xfff2a0);
     inhaleRing(8, 0xfff2b0); setTimeout(() => G && inhaleRing(5, 0xfff2b0), 150);
   } else {
-    audio.coin(Math.min(25, G.combo)); vib(6, 60);
+    audio.coin(Math.min(25, G.combo));
     if (G.combo % 5 === 0) { // 5連続ごと：光の輪が吸い込まれ、鈴が鳴る
       const lv = Math.min(6, G.combo / 5);
       inhaleRing(2.5 + lv * 0.8, lv >= 4 ? 0xfff6d0 : 0xffe08a);
@@ -1192,7 +1229,7 @@ function frameVisuals(dt, t) {
     const k = s.t / (s.inward ? 0.45 : 0.7);
     if (s.inward) { s.m.position.set(mouthW.x, mouthW.y, 0.6); s.m.scale.setScalar(0.15 + (1 - k) * s.size); s.m.material.opacity = Math.max(0, 0.9 * Math.sin(Math.min(1, k) * Math.PI)); }
     else { s.m.scale.setScalar(1 + k * s.size); s.m.material.opacity = Math.max(0, 0.9 * (1 - k)); }
-    if (k >= 1) { scene.remove(s.m); s.m.geometry.dispose(); s.m.material.dispose(); shockwaves.splice(i, 1); }
+    if (k >= 1) { s.m.visible = false; shockPool.push(s.m); shockwaves.splice(i, 1); }
   }
   // すれ違う雲（近くを高速で抜けていく）
   for (const c of world.passClouds) c.material.opacity = 0.25 + speed01 * 0.35;
