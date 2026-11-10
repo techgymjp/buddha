@@ -1,7 +1,7 @@
 // 音まわり：効果音と、シタール・タンプーラ・シンギングボウルの瞑想BGM
 // スマホで音が切れないよう、すべての音はゲーム開始前に AudioBuffer として作っておき、再生時は流すだけにする
 
-const SR = 44100;
+const SR = 32000; // 作る音のサンプリング周波数（読み込みを速くするため控えめ）
 const SA = 138.59; // 主音 Sa = C#3
 // ブーパーリー（五音音階：Sa Re Ga Pa Dha）
 const SITAR_STEPS = [-5, -3, 0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
@@ -104,6 +104,73 @@ function pluckBuffer(f0, f1, dur, opts = {}) {
   return out;
 }
 
+// ---------- BGMを丸ごと書き出す（ゲーム中は途切れないループ再生だけにする） ----------
+const MUSIC_SR = 32000, MUSIC_LEN = 64, MUSIC_TAIL = 7, JHALA_LEN = 4.8;
+function makeIR(ctx, seconds) {
+  const len = Math.floor(ctx.sampleRate * seconds), ir = ctx.createBuffer(2, len, ctx.sampleRate);
+  for (let ch = 0; ch < 2; ch++) { const d = ir.getChannelData(ch); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.2); }
+  return ir;
+}
+async function renderMusic(eng, layer) {
+  const C = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  const LEN = layer === 'base' ? MUSIC_LEN : JHALA_LEN;
+  const oc = new C(2, Math.round((LEN + MUSIC_TAIL) * MUSIC_SR), MUSIC_SR);
+  const bufCache = new Map();
+  const toBuf = (v) => {
+    if (!v) return null;
+    if (!v.raw) return v;
+    if (!bufCache.has(v)) { const b = oc.createBuffer(1, v.raw.length, SR); b.getChannelData(0).set(v.raw); bufCache.set(v, b); }
+    return bufCache.get(v);
+  };
+  // 残響と、シタールの胴鳴り（鼻にかかった音色）
+  const out = oc.createGain(); out.gain.value = 1; out.connect(oc.destination);
+  const rev = oc.createConvolver(); rev.buffer = makeIR(oc, 2.8);
+  const wet = oc.createGain(); wet.gain.value = 0.5; rev.connect(wet).connect(oc.destination);
+  const send = oc.createGain(); send.gain.value = 0.7; out.connect(send).connect(rev);
+  const sitarBus = oc.createBiquadFilter(); sitarBus.type = 'peaking'; sitarBus.frequency.value = 2600; sitarBus.Q.value = 1.2; sitarBus.gain.value = 7;
+  const body = oc.createBiquadFilter(); body.type = 'peaking'; body.frequency.value = 420; body.Q.value = 1.5; body.gain.value = 4;
+  sitarBus.connect(body).connect(out);
+  const play = (buf, t, gain, dest, pan = 0) => {
+    const b = toBuf(buf); if (!b) return;
+    const src = oc.createBufferSource(); src.buffer = b;
+    const g = oc.createGain(); g.gain.value = gain;
+    const p = oc.createStereoPanner(); p.pan.value = pan;
+    src.connect(g).connect(p).connect(dest); src.start(t);
+  };
+  if (layer === 'base') {
+    // タンプーラ：Pa - Sa - Sa - Sa(低) の持続音
+    const tan = [eng.buf.tanPa, eng.buf.tanSa, eng.buf.tanSa, eng.buf.tanLo];
+    for (let t = 0, k = 0; t < MUSIC_LEN; t += 1.05, k++) play(tan[k % 4], t, 0.16, out, k % 2 ? -0.3 : 0.3);
+    // ボウル
+    for (let t = 0.1; t < MUSIC_LEN; t += 7 + Math.random() * 6) { const i = Math.random() * 5 | 0; play(eng.buf['bowl' + i], t, i === 1 || i === 3 ? 0.06 : 0.09, out, (Math.random() - 0.5) * 0.8); }
+    // シタール：アーラープ風の即興
+    let t = 2.5, idx = 2, left = 0;
+    while (t < MUSIC_LEN - 1) {
+      if (left <= 0) { left = 3 + (Math.random() * 6 | 0); t += 1.0 + Math.random() * 1.8; continue; }
+      const step = [-2, -1, -1, 1, 1, 2][Math.random() * 6 | 0];
+      let ni = Math.max(0, Math.min(SITAR_STEPS.length - 1, idx + step));
+      if (left === 1) { const homes = [2, 5, 7]; ni = homes.reduce((a, b) => Math.abs(b - idx) < Math.abs(a - idx) ? b : a); }
+      const meend = Math.random() < 0.38 && Math.abs(ni - idx) <= 2;
+      play(eng.sitar[`${meend ? idx : ni}>${ni}`] || eng.sitar[`${ni}>${ni}`], t, 0.28, sitarBus, (Math.random() - 0.5) * 0.3);
+      idx = ni; left--;
+      t += [0.32, 0.45, 0.6, 0.6, 0.9, 1.25][Math.random() * 6 | 0];
+    }
+  } else {
+    // 速く昇ったときに重ねるリズム（チカリ弦の刻み）
+    for (let k = 0; k < 24; k++) play(eng.buf.chikari, k * 0.2, k % 4 === 0 ? 0.16 : 0.1, sitarBus, 0.35); // 短い刻みを繰り返す
+  }
+  const rendered = await oc.startRendering();
+  // 曲の終わりで鳴り続けている音を頭に重ねて、つなぎ目なくループさせる
+  const n = Math.round(LEN * MUSIC_SR), tail = MUSIC_TAIL * MUSIC_SR, chans = [];
+  for (let ch = 0; ch < 2; ch++) {
+    const d = rendered.getChannelData(ch), o = new Float32Array(n);
+    o.set(d.subarray(0, n));
+    for (let i = 0; i < tail; i++) o[i % n] += d[n + i]; // 尾を頭に重ねる（短いループは何周分でも）
+    chans.push(o);
+  }
+  return { raw2: chans, sr: MUSIC_SR };
+}
+
 export class AudioEngine {
   constructor(muted) {
     this.ctx = null;
@@ -153,6 +220,8 @@ export class AudioEngine {
       const base = 1318 * Math.pow(2, lv / 12);
       this.buf['chime' + lv] = await offline(1.6, (c, d) => { metal(c, d, 0.005, base, 0.22, 1.0); metal(c, d, 0.075, base * 1.5, 0.18, 1.0); if (lv >= 3) metal(c, d, 0.145, base * 2, 0.14, 1.2); });
     });
+    tasks.push(async () => { this.buf.musicBase = await renderMusic(this, 'base'); });
+    tasks.push(async () => { this.buf.musicJhala = await renderMusic(this, 'jhala'); });
     for (let i = 0; i < tasks.length; i++) {
       await tasks[i]();
       onProgress((i + 1) / tasks.length);
@@ -160,6 +229,7 @@ export class AudioEngine {
     }
     this.convertAll();
     this.ready = true;
+    if (this.ctx && !this.musicStarted) this.startMusic();
   }
 
   // ---------- 再生の準備（ユーザー操作の中で呼ぶ） ----------
@@ -179,14 +249,10 @@ export class AudioEngine {
     for (let ch = 0; ch < 2; ch++) { const d = ir.getChannelData(ch); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.2); }
     this.reverb.buffer = ir;
     const wet = ctx.createGain(); wet.gain.value = 0.55; this.reverb.connect(wet).connect(this.master);
-    this.music = ctx.createGain(); this.music.gain.value = 0.55; this.music.connect(this.master);
-    const ms = ctx.createGain(); ms.gain.value = 0.7; this.music.connect(ms).connect(this.reverb);
+    this.music = ctx.createGain(); this.music.gain.value = 0.6; this.music.connect(this.master);
     this.sfx = ctx.createGain(); this.sfx.gain.value = 1; this.sfx.connect(this.master);
     const ss = ctx.createGain(); ss.gain.value = 0.25; this.sfx.connect(ss).connect(this.reverb);
     // シタールの胴鳴り
-    this.sitarBus = ctx.createBiquadFilter(); this.sitarBus.type = 'peaking'; this.sitarBus.frequency.value = 2600; this.sitarBus.Q.value = 1.2; this.sitarBus.gain.value = 7;
-    const body = ctx.createBiquadFilter(); body.type = 'peaking'; body.frequency.value = 420; body.Q.value = 1.5; body.gain.value = 4;
-    this.sitarBus.connect(body).connect(this.music);
     this.setupWind();
     this.startMusic();
   }
@@ -195,6 +261,7 @@ export class AudioEngine {
   convertAll() {
     const ctx = this.ctx; if (!ctx) return;
     const toBuf = (v) => {
+      if (v && v.raw2) { const b = ctx.createBuffer(2, v.raw2[0].length, v.sr); b.getChannelData(0).set(v.raw2[0]); b.getChannelData(1).set(v.raw2[1]); return b; }
       if (!v || !v.raw) return v;
       const b = ctx.createBuffer(1, v.raw.length, SR); b.getChannelData(0).set(v.raw); return b;
     };
@@ -222,44 +289,23 @@ export class AudioEngine {
     src.start(when);
   }
 
-  // ---------- BGM ----------
+  // ---------- BGM：書き出しておいた曲をループ再生するだけ（描画が重くても途切れない） ----------
   startMusic() {
-    const t = this.ctx.currentTime + 0.3;
-    this.next = { tanpura: t, sitar: t + 2.5, bowl: t + 0.1, chikari: t + 4 };
-    this.tanpuraStep = 0; this.sitarIdx = 2; this.phraseLeft = 0;
-    this.timer = setInterval(() => this.schedule(), 200);
-  }
-  schedule() {
-    const ctx = this.ctx; if (!ctx || ctx.state !== 'running' || !this.ready) return;
-    if (!this.next.started) { const t = ctx.currentTime + 0.2; this.next = { started: true, tanpura: t, sitar: t + 2.5, bowl: t + 0.1, chikari: t + 4 }; }
-    const now = ctx.currentTime, ahead = now + 1.2; // 先読みを長めにして、描画が重くても途切れない
-    for (const k of ['tanpura', 'sitar', 'bowl', 'chikari']) if (this.next[k] < now - 0.5) this.next[k] = now + 0.05; // 大きく遅れたら追いつく
-    const I = this.intensity;
-    while (this.next.tanpura < ahead) {
-      const b = [this.buf.tanPa, this.buf.tanSa, this.buf.tanSa, this.buf.tanLo][this.tanpuraStep % 4];
-      this.playBuffer(b, this.next.tanpura, 0.16, this.music, this.tanpuraStep % 2 ? -0.3 : 0.3);
-      this.tanpuraStep++; this.next.tanpura += 1.05;
-    }
-    while (this.next.bowl < ahead) {
-      const i = Math.random() * 5 | 0;
-      this.playBuffer(this.buf['bowl' + i], this.next.bowl, i === 1 || i === 3 ? 0.06 : 0.09, this.music, (Math.random() - 0.5) * 0.8);
-      this.next.bowl += 7 + Math.random() * 7 - I * 3;
-    }
-    while (this.next.sitar < ahead) {
-      if (this.phraseLeft <= 0) { this.phraseLeft = 3 + (Math.random() * (5 + I * 6) | 0); this.next.sitar += 1.2 + Math.random() * 2.5 * (1 - I * 0.7); continue; }
-      const step = [-2, -1, -1, 1, 1, 2][Math.random() * 6 | 0];
-      let idx = Math.max(0, Math.min(SITAR_STEPS.length - 1, this.sitarIdx + step));
-      if (this.phraseLeft === 1) { const homes = [2, 5, 7]; idx = homes.reduce((a, b) => Math.abs(b - this.sitarIdx) < Math.abs(a - this.sitarIdx) ? b : a); }
-      const meend = Math.random() < 0.38 && Math.abs(idx - this.sitarIdx) <= 2;
-      const b = this.sitar[`${meend ? this.sitarIdx : idx}>${idx}`] || this.sitar[`${idx}>${idx}`];
-      this.playBuffer(b, this.next.sitar, 0.28, this.sitarBus, (Math.random() - 0.5) * 0.3);
-      this.sitarIdx = idx; this.phraseLeft--;
-      this.next.sitar += [0.32, 0.45, 0.6, 0.6, 0.9, 1.25][Math.random() * 6 | 0] * (1 - I * 0.45);
-    }
-    while (this.next.chikari < ahead) {
-      if (I > 0.45) { this.playBuffer(this.buf.chikari, this.next.chikari, 0.05 + (I - 0.45) * 0.12, this.sitarBus, 0.4); this.next.chikari += 0.26 - (I - 0.45) * 0.12; }
-      else this.next.chikari += 0.5;
-    }
+    const ctx = this.ctx;
+    if (!this.ready || !this.buf.musicBase || this.buf.musicBase.raw2) return;
+    this.musicStarted = true;
+    const t = ctx.currentTime + 0.1;
+    const base = ctx.createBufferSource(); base.buffer = this.buf.musicBase; base.loop = true;
+    const jhala = ctx.createBufferSource(); jhala.buffer = this.buf.musicJhala; jhala.loop = true;
+    this.jhalaGain = ctx.createGain(); this.jhalaGain.gain.value = 0;
+    base.connect(this.music);
+    jhala.connect(this.jhalaGain).connect(this.music);
+    base.start(t); jhala.start(t);
+    // 速く昇るほどリズムの層を重ねる
+    this.timer = setInterval(() => {
+      const I = this.intensity;
+      this.jhalaGain.gain.setTargetAtTime(I > 0.4 ? Math.min(1, (I - 0.4) / 0.4) : 0, ctx.currentTime, 0.6);
+    }, 250);
   }
 
   // ---------- 風切り音 ----------

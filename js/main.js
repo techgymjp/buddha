@@ -4,9 +4,9 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { buildBuddha, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611101846';
-import { World, UNIT_M, makeLightPillars } from './world.js?v=202611101846';
-import { AudioEngine } from './audio.js?v=202611101846';
+import { buildBuddha, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611101852';
+import { World, UNIT_M, makeLightPillars } from './world.js?v=202611101852';
+import { AudioEngine } from './audio.js?v=202611101852';
 
 const $ = (id) => document.getElementById(id);
 const store = {
@@ -51,6 +51,8 @@ try {
   throw e;
 }
 const isMobile = matchMedia('(pointer: coarse)').matches;
+// 確認用：URLに ?lv=1〜5 を付けると、タイトル画面にその形態の仏像を出す
+const FORCE_LV = Math.max(0, Math.min(5, parseInt(new URLSearchParams(location.search).get('lv'), 10) || 0));
 // 画質レベル（重ければ自動で下げる）：[解像度の上限, ブルームの有無]
 const QUALITY = [[1.75, true], [1.4, true], [1.15, true], [1.0, false], [0.8, false]];
 let quality = isMobile ? 2 : 0;
@@ -88,6 +90,7 @@ window.addEventListener('resize', resize);
 resize();
 
 const audio = new AudioEngine(store.get('muted', false));
+window.__audio = audio;
 function toggleSound() { audio.setMuted(!audio.muted); store.set('muted', audio.muted); updateSoundBtns(); }
 function updateSoundBtns() { for (const id of ['soundBtn', 'pauseSound']) $(id).textContent = audio.muted ? '× 音なし' : '♪ 音あり'; }
 updateSoundBtns();
@@ -827,7 +830,7 @@ function frameVisuals(dt, t) {
   if (!G || state === 'title') {
     // タイトル：境内で硬貨を吸い込む仏像を、カメラがゆっくり回る
     titleT += dt;
-    const lv = 1; // タイトルは木造仏から
+    const lv = FORCE_LV || 1; // タイトルは木造仏から（確認用に ?lv=1〜5 で形態を指定できる）
     if (!model || model.userData.lv !== lv) setModel(lv);
     by = 1.6; bx = 0; S = lv === 5 ? 1.35 : 1.1;
     buddhaRoot.position.set(0, by + Math.sin(t * 0.0015) * 0.15, 0);
