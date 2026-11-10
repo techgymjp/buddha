@@ -4,9 +4,9 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { buildBuddha, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611101800';
-import { World, UNIT_M, makeLightPillars } from './world.js?v=202611101800';
-import { AudioEngine } from './audio.js?v=202611101800';
+import { buildBuddha, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611101801';
+import { World, UNIT_M, makeLightPillars } from './world.js?v=202611101801';
+import { AudioEngine } from './audio.js?v=202611101801';
 
 const $ = (id) => document.getElementById(id);
 const store = {
@@ -33,7 +33,7 @@ const FORMS = [
 const COINS = {
   zeni: { money: 10, r: 0.46, boost: 5.5, w: 70 },
   koban: { money: 300, r: 0.6, boost: 6, w: 9 },
-  goriyaku: { money: 500, r: 0.45, boost: 12, w: 2.2 },
+  goriyaku: { money: 500, r: 0.45, boost: 16, w: 2.2 },
   noroi: { money: 0, r: 0.38, boost: -5, w: 0 },
 };
 const FEVER_AT = 0.82, HENSHIN_NEED = 14;
@@ -392,22 +392,20 @@ function extendPath(limitY) {
       for (const off of [-1.4, 0, 1.4]) addCoin(Math.random() < 0.14 ? 'koban' : 'zeni', P.x + off, P.y + (Math.random() - 0.5) * 0.3);
       continue;
     }
-    if (P.mode === 'branch') { // 分かれ道：片方は小判、もう片方は呪いの銭まじり
+    if (P.mode === 'branch') { // 分かれ道：片方は小判まじり
       const spread = Math.min(LANE, (P.left < 3 ? P.left : 3) * 1.3);
       for (const side of [-1, 1]) {
         const good = side === P.good;
         const x = P.x + side * spread;
-        const type = good ? (P.n % 4 === 0 ? 'koban' : 'zeni') : (P.n % 3 === 0 ? 'noroi' : 'zeni');
+        const type = good ? (P.n % 3 === 0 ? 'koban' : 'zeni') : 'zeni'; // 分かれ道：片方は小判まじり
         addCoin(type, x, P.y);
       }
       continue;
     }
     let type = 'zeni';
     if (P.n % 6 === 0) type = 'koban';
-    else if (Math.random() < 0.008 + G.stage * 0.002) type = 'goriyaku';
-    else if (Math.random() < st.curse * 0.18) type = 'noroi'; // 道の上の呪い：一瞬離すか避ける
+    else if (Math.random() < 0.016 + G.stage * 0.003) type = 'goriyaku';
     addCoin(type, P.x, P.y, z);
-    if (Math.random() < st.curse * 0.45) addCoin('noroi', P.x + (Math.random() < 0.5 ? -1 : 1) * (1.6 + Math.random()), P.y + Math.random() * 0.4); // 道のわきの呪い
   }
 }
 function spawnFoe(cy, halfH) {
@@ -456,7 +454,7 @@ function suckR() {
 const suckPow = () => 42 + G.form * 6 + (G.gori > 0 ? 30 : 0) + (G.dai > 0 ? 60 : 0);
 // 最高速度（仏像が大きいほど・御利益中・大仏で上がる）
 function maxSpeed() {
-  let vm = 18 + G.stage * 1.5 + G.form * 2 + (G.gori > 0 ? 8 : 0) + (G.dai > 0 ? 22 : 0);
+  let vm = 18 + G.stage * 1.5 + G.form * 2 + (G.gori > 0 ? 18 : 0) + (G.dai > 0 ? 22 : 0);
   if (G.fever && G.dai <= 0) vm = Math.min(vm, 20); // 賽銭の嵐では吸い込む時間をつくる
   return vm;
 }
@@ -486,7 +484,7 @@ function update(dt) {
 
   // 上昇の勢い：吸った硬貨で加速し、吸わなければ重力で減速する
   if (G.dai > 0) G.v += 25 * dt;
-  else G.v += ((G.gori > 0 ? 10 : 0) - st.grav) * dt;
+  else G.v += ((G.gori > 0 ? 18 * Math.min(1, G.gori / 2) : 0) - st.grav) * dt; // 黄金の御利益コインで加速度が増す
   const vm = maxSpeed();
   if (G.v > vm) G.v += (vm - G.v) * Math.min(1, 2 * dt);
   G.v = Math.min(G.v, vm + 10); // 上乗せの加速は最高速度+10m/sまで
@@ -657,8 +655,8 @@ function absorb(c) {
     inhale(30, 3.2, 0xffe066);
     inhaleRing(4.5, 0xffe08a);
   } else if (c.type === 'goriyaku') {
-    audio.goriyaku(); G.gori = 6; flash(0.45); G.fovKick += 10; G.shake = 0.4;
-    banner('御利益！', '吸引範囲アップ・呪い無効・超加速');
+    audio.goriyaku(); G.gori = 6; flash(0.5); G.fovKick += 16; G.shake = 0.5; G.lift = Math.min(2.8, G.lift + 1.5); G.surge = 1.6;
+    banner('御利益！', '');
     inhale(70, 5, 0xfff2a0);
     inhaleRing(8, 0xfff2b0); setTimeout(() => G && inhaleRing(5, 0xfff2b0), 150);
   } else {
