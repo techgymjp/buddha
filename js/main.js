@@ -4,10 +4,10 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { buildBuddha, buildSkin, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611102330';
-import { World, UNIT_M, makeLightPillars } from './world.js?v=202611102330';
-import { t, lang, setLang, applyStatic } from './i18n.js?v=202611102330';
-import { AudioEngine } from './audio.js?v=202611102330';
+import { buildBuddha, buildSkin, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611102356';
+import { World, UNIT_M, ALT_M, makeLightPillars } from './world.js?v=202611102356';
+import { t, lang, setLang, applyStatic } from './i18n.js?v=202611102356';
+import { AudioEngine } from './audio.js?v=202611102356';
 
 const $ = (id) => document.getElementById(id);
 const store = {
@@ -26,10 +26,10 @@ const STAGES = [
 let acc = 0; STAGES.forEach((s) => { s.start = acc; acc += s.goal; });
 const FORMS = [
   { lv: 1, name: '木造仏', need: 0, scale: 0.95 },
-  { lv: 2, name: '黒漆の仏像', need: 12000, minStage: 0, scale: 1.0 },
-  { lv: 3, name: '光背の仏像', need: 30000, minStage: 1, scale: 1.05 },
-  { lv: 4, name: '鎌倉の大仏', need: 55000, minStage: 2, scale: 1.2 },
-  { lv: 5, name: '黄金の大仏', need: 85000, minStage: 3, scale: 1.35 },
+  { lv: 2, name: '黒漆の仏像', need: 36000, minStage: 0, scale: 1.0 },
+  { lv: 3, name: '光背の仏像', need: 90000, minStage: 1, scale: 1.05 },
+  { lv: 4, name: '鎌倉の大仏', need: 165000, minStage: 2, scale: 1.2 },
+  { lv: 5, name: '黄金の大仏', need: 255000, minStage: 3, scale: 1.35 },
 ];
 const COINS = {
   zeni: { money: 10, r: 0.46, boost: 18, w: 70 },  // boost: 逆重力で得る速度（m/s）
@@ -122,12 +122,12 @@ function slowmo(sec, scale = 0.3) { slowT = Math.max(slowT, sec); timeScale = sc
 
 // ---------- お寺：集めた賽銭を貯めて寄進し、境内に建物が増えていく ----------
 const BUILDINGS = [
-  { id: 'sanmon', cost: 3000, unlock: 'daruma' },
-  { id: 'lanterns', cost: 8000 },
-  { id: 'hondo', cost: 20000, unlock: 'kannon' },
-  { id: 'shoro', cost: 40000 },
-  { id: 'pagoda', cost: 70000, unlock: 'fudo' },
-  { id: 'daibutsuden', cost: 120000 },
+  { id: 'sanmon', cost: 9000, unlock: 'daruma' },
+  { id: 'lanterns', cost: 24000 },
+  { id: 'hondo', cost: 60000, unlock: 'kannon' },
+  { id: 'shoro', cost: 360000 },
+  { id: 'pagoda', cost: 210000, unlock: 'fudo' },
+  { id: 'daibutsuden', cost: 360000 },
 ];
 const SKINS = ['buddha', 'daruma', 'kannon', 'fudo'];
 let temple = store.get('temple', { wallet: 0, built: [] });
@@ -362,7 +362,7 @@ window.addEventListener('blur', () => { input.down = input.key = input.left = in
 
 // ---------- 画面遷移 ----------
 let state = 'title';
-let best = store.get('best', { score: 0, alt: 0 });
+let best = store.get('best3', { score: 0, alt: 0 });
 const show = (id, on) => $(id).classList.toggle('hidden', !on);
 function refreshBest() {
   $('bestTitle').textContent = best.alt ? t('bestTitle', { m: best.alt.toLocaleString() }) : '';
@@ -470,7 +470,7 @@ function startGame() {
   G = newGameState();
   G.rec = []; G.recT = 0;
   G.perk = perks(); G.charms = G.perk.charms;
-  ghostRun = store.get('ghost', null);
+  ghostRun = store.get('ghost3', null);
   setModel(1);
   resetMotes(G.camY);
   show('title', false); show('hud', true);
@@ -684,7 +684,7 @@ const suckPow = () => 42 + G.form * 6 + (G.gori > 0 ? 30 : 0) + (G.dai > 0 ? 60 
 function maxSpeed() {
   return STAGES[G.stage].scroll + 8 + G.form * 1.5 + (G.gori > 0 ? 16 : 0) + (G.dai > 0 ? 25 : 0);
 }
-const altM = () => Math.max(0, G.by * UNIT_M);
+const altM = () => Math.max(0, G.by * ALT_M);
 // 難しさ：1,500mを超えると高度に応じて上がっていく（終わりのない区間でもいずれ限界が来る）
 const hardness = () => 1 + Math.max(0, altM() - 2000) / 7000;
 window.__altM = () => altM();
@@ -714,7 +714,7 @@ function update(dt) {
   if (G.launch > 0) {
     G.launch -= dt;
     if (G.launch > 0) return;
-    G.v = 32; G.launchedAt = G.time; G.rocket = G.perk.start / UNIT_M; G.surge = 1.6; G.fovKick += 8; G.shake = 0.3;
+    G.v = 32; G.launchedAt = G.time; G.rocket = G.perk.start / ALT_M; G.surge = 1.6; G.fovKick += 8; G.shake = 0.3;
     audio.stomp(); flash(0.15);
     shockwave(G.bx, G.by - 0.7, 0xfff0c0, 8);
     emit(G.bx, G.by - 0.7, 0, 0xffe0a0, 60, 6, 0.9);
@@ -1052,7 +1052,7 @@ function gameOver(reason = '') {
   const prevBest = best.alt;
   saveBest();
   G.offer = Math.round(G.money * perks().offer); temple.wallet += G.offer; store.set('temple', temple); // 集めた賽銭はお寺の財布に貯まる
-  if (Math.floor(G.maxAlt || altM()) > prevBest && G.rec && G.rec.length > 20) store.set('ghost', { alt: Math.floor(G.maxAlt || altM()), pts: G.rec });
+  if (Math.floor(G.maxAlt || altM()) > prevBest && G.rec && G.rec.length > 20) store.set('ghost3', { alt: Math.floor(G.maxAlt || altM()), pts: G.rec });
   audio.over();
   const alt = Math.floor(G.maxAlt || altM());
   const isBest = alt > prevBest;
@@ -1075,7 +1075,7 @@ function rank(alt) {
 }
 function saveBest() {
   const a = Math.floor(G.maxAlt || altM());
-  if (G.score > best.score || a > best.alt) { best = { score: Math.max(best.score, G.score), alt: Math.max(best.alt, a) }; store.set('best', best); }
+  if (G.score > best.score || a > best.alt) { best = { score: Math.max(best.score, G.score), alt: Math.max(best.alt, a) }; store.set('best3', best); }
   refreshBest();
 }
 
@@ -1086,7 +1086,7 @@ function updateHUD() {
   const st = STAGES[G.stage];
   setText('score', Math.floor(Math.max(G.maxAlt || 0, altM())).toLocaleString());
   setText('alt', Math.floor(altM()).toLocaleString());
-  setText('speed', Math.max(0, Math.round(G.v)).toString());
+  setText('speed', Math.max(0, Math.round(G.v * ALT_M / UNIT_M)).toString());
   setText('money', G.money.toLocaleString() + (G.charms > 0 ? `  🛡${G.charms}` : ''));
   setText('formName', G.dai > 0 ? t('giant') : formLabel(form()));
   setText('goalLbl', G.stage < LAST ? `▲ ${Math.max(0, Math.ceil(st.start + st.goal - altM())).toLocaleString()}m` : (best.alt > altM() ? `👑 ${best.alt.toLocaleString()}m` : '👑'));
