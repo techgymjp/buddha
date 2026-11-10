@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Old+Mincho:wght@700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=202611101729">
+<link rel="stylesheet" href="style.css?v=202611101731">
 <script type="importmap">
 { "imports": { "three": "./vendor/three.module.min.js", "three/addons/": "./vendor/addons/" } }
 </script>
@@ -34,7 +34,7 @@
   </div>
   <div class="hud-row second">
     <div class="money"><i class="coin-ico"></i><span id="money">0</span></div>
-    <div class="form"><span id="formName">Lv.1 木造仏</span><div class="togo" id="goalLbl">目標まで あと 600m</div></div>
+    <div class="form"><span id="formName">Lv.1 木造仏</span><div class="togo" id="goalLbl"></div></div>
   </div>
   <div id="status"></div>
   <button id="pauseBtn" type="button" aria-label="一時停止">Ⅱ</button>
@@ -43,11 +43,6 @@
 <!-- 下部：タップ操作 -->
 <div id="panel" class="hidden">
   <div class="suck" id="suckBtn"><span id="suckLbl">吸う</span></div>
-  <div class="howto">
-    <div><b>長押し</b>で吸い込む・<b>離す</b>と止まる</div>
-    <div>押したまま<b>左右にスワイプ</b>で移動</div>
-    <div class="warn">呪いの銭は吸うな！ <span class="pc">PC：Space 吸引 / ←→ 移動</span></div>
-  </div>
 </div>
 
 <div id="floaters"></div>
@@ -114,6 +109,6 @@
 
 <div id="nogl" class="screen hidden"><div class="card"><h2 class="gold">WebGLが使えません</h2><p>このゲームは3D表示（WebGL）に対応したブラウザで遊べます。</p></div></div>
 
-<script type="module" src="js/main.js?v=202611101729"></script>
+<script type="module" src="js/main.js?v=202611101731"></script>
 </body>
 </html>

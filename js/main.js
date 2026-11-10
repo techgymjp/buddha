@@ -4,9 +4,9 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { buildBuddha, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611101729';
-import { World, UNIT_M, makeLightPillars } from './world.js?v=202611101729';
-import { AudioEngine } from './audio.js?v=202611101729';
+import { buildBuddha, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611101731';
+import { World, UNIT_M, makeLightPillars } from './world.js?v=202611101731';
+import { AudioEngine } from './audio.js?v=202611101731';
 
 const $ = (id) => document.getElementById(id);
 const store = {
@@ -25,10 +25,10 @@ const STAGES = [
 let acc = 0; STAGES.forEach((s) => { s.start = acc; acc += s.goal; });
 const FORMS = [
   { lv: 1, name: '木造仏', need: 0, scale: 0.95 },
-  { lv: 2, name: '黒漆の仏像', need: 5000, scale: 1.0 },
-  { lv: 3, name: '光背の仏像', need: 16000, scale: 1.05 },
-  { lv: 4, name: '千手観音', need: 30000, scale: 1.1 },
-  { lv: 5, name: '黄金の大仏', need: 50000, scale: 1.35 },
+  { lv: 2, name: '黒漆の仏像', need: 12000, minStage: 0, scale: 1.0 },
+  { lv: 3, name: '光背の仏像', need: 30000, minStage: 1, scale: 1.05 },
+  { lv: 4, name: '千手観音', need: 55000, minStage: 2, scale: 1.1 },
+  { lv: 5, name: '黄金の大仏', need: 85000, minStage: 3, scale: 1.35 },
 ];
 const COINS = {
   zeni: { money: 10, r: 0.46, boost: 5.5, w: 70 },
@@ -196,6 +196,7 @@ function inhale(n, radius, color = 0xffe3a0) {
 // ---------- 浮き文字・バナー ----------
 const floaters = [];
 function floatText(x, y, z, text, color = '#fff', size = 22, life = 0.9) {
+  return; // プレイ中は文章を出さない
   const el = document.createElement('div'); el.className = 'fl'; el.textContent = text;
   el.style.color = color; el.style.fontSize = size + 'px';
   $('floaters').appendChild(el);
@@ -214,6 +215,7 @@ function updateFloaters(dt) {
 }
 let bannerT = 0;
 function banner(main, sub = '', color = '') {
+  return; // プレイ中は文章を出さない
   $('banner').innerHTML = `<div class="b1 gold">${main}</div>${sub ? `<div class="b2">${sub}</div>` : ''}`;
   if (color) $('banner').querySelector('.b1').style.filter = `drop-shadow(0 4px 0 ${color}) drop-shadow(0 0 16px rgba(255,180,60,.8))`;
   bannerT = 1.8;
@@ -635,7 +637,7 @@ function absorb(c) {
   }
   // 成長
   let nf = G.form;
-  while (nf + 1 < FORMS.length && G.money >= FORMS[nf + 1].need) nf++;
+  while (nf + 1 < FORMS.length && G.money >= FORMS[nf + 1].need && G.stage >= FORMS[nf + 1].minStage) nf++; // お金とステージの両方が必要
   if (nf > G.form) {
     G.form = nf;
     if (G.dai <= 0) setModel(FORMS[nf].lv);
@@ -712,12 +714,8 @@ function updateHUD() {
   setText('speed', Math.max(0, Math.round(G.v)).toString());
   setText('money', G.money.toLocaleString());
   setText('formName', G.dai > 0 ? '巨大大仏' : `Lv.${form().lv} ${form().name}`);
-  setText('goalLbl', `目標まで あと ${Math.max(0, Math.ceil(st.start + st.goal - altM())).toLocaleString()}m`);
-  let s = '';
-  if (G.v < 0) s = '落下中！ 長押しで硬貨を吸え！';
-  else if (G.fever && G.dai <= 0) s = `賽銭の嵐 ${Math.min(G.feverCount, HENSHIN_NEED)} / ${HENSHIN_NEED} 枚`;
-  else if (G.gori > 0) s = `御利益 ${G.gori.toFixed(1)}秒`;
-  else if (G.combo >= 5) s = `${G.combo} 連続`;
+  setText('goalLbl', `▲ ${Math.max(0, Math.ceil(st.start + st.goal - altM())).toLocaleString()}m`);
+  const s = '';
   setText('status', s);
   const sb = $('suckBtn');
   sb.classList.toggle('on', !!G.sucking); sb.classList.toggle('cursed', G.curse > 0);
