@@ -4,9 +4,9 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { buildBuddha, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611101733';
-import { World, UNIT_M, makeLightPillars } from './world.js?v=202611101733';
-import { AudioEngine } from './audio.js?v=202611101733';
+import { buildBuddha, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611101738';
+import { World, UNIT_M, makeLightPillars } from './world.js?v=202611101738';
+import { AudioEngine } from './audio.js?v=202611101738';
 
 const $ = (id) => document.getElementById(id);
 const store = {
@@ -48,7 +48,11 @@ try {
   $('nogl').classList.remove('hidden'); $('title').classList.add('hidden');
   throw e;
 }
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+const isMobile = matchMedia('(pointer: coarse)').matches;
+// 画質レベル（重ければ自動で下げる）：[解像度の上限, ブルームの有無]
+const QUALITY = [[1.75, true], [1.4, true], [1.15, true], [1.0, false], [0.8, false]];
+let quality = isMobile ? 2 : 0;
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, QUALITY[quality][0]));
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 0.92;
 const scene = new THREE.Scene();
@@ -62,12 +66,21 @@ const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.32, 0.4, 0.93);
 composer.addPass(bloom);
 composer.addPass(new OutputPass());
 
+// ゲーム画面はスマホと同じ縦長の枠。PCでは画面中央に縦長で表示する
+const APP_ASPECT = 9 / 19.5;
+let appW = 390, appH = 844;
 function resize() {
-  const w = window.innerWidth, h = window.innerHeight;
-  renderer.setSize(w, h, false);
-  composer.setSize(w, h);
-  bloom.resolution.set(w / 2, h / 2);
-  camera.aspect = w / h; camera.updateProjectionMatrix();
+  const W = window.innerWidth, H = window.innerHeight;
+  if (W / H <= 0.62) { appW = W; appH = H; } // スマホの縦画面はそのまま全面
+  else { appH = H; appW = Math.round(H * APP_ASPECT); }
+  const app = $('app'); app.style.width = appW + 'px'; app.style.height = appH + 'px';
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, QUALITY[quality][0]));
+  renderer.setSize(appW, appH, false);
+  composer.setPixelRatio ? composer.setPixelRatio(renderer.getPixelRatio()) : null;
+  composer.setSize(appW, appH);
+  bloom.resolution.set(appW / 2, appH / 2);
+  bloom.enabled = QUALITY[quality][1];
+  camera.aspect = appW / appH; camera.updateProjectionMatrix();
 }
 window.addEventListener('resize', resize);
 resize();
@@ -76,6 +89,11 @@ const audio = new AudioEngine(store.get('muted', false));
 function toggleSound() { audio.setMuted(!audio.muted); store.set('muted', audio.muted); updateSoundBtns(); }
 function updateSoundBtns() { for (const id of ['soundBtn', 'pauseSound']) $(id).textContent = audio.muted ? '× 音なし' : '♪ 音あり'; }
 updateSoundBtns();
+// 音はゲーム開始前にすべて作っておく（スマホで音が切れないように）
+$('startBtn').disabled = true;
+audio.preload((k) => { $('startBtn').textContent = `読み込み中 ${Math.round(k * 100)}%`; }).then(() => {
+  $('startBtn').disabled = false; $('startBtn').textContent = 'スタート';
+});
 
 // ---------- 仏像 ----------
 const buddhaRoot = new THREE.Group(); scene.add(buddhaRoot);
@@ -208,8 +226,8 @@ function updateFloaters(dt) {
     const f = floaters[i]; f.life -= dt; f.p.y += dt * 1.2;
     if (f.life <= 0) { f.el.remove(); floaters.splice(i, 1); continue; }
     proj.copy(f.p).project(camera);
-    f.el.style.left = ((proj.x + 1) / 2 * window.innerWidth) + 'px';
-    f.el.style.top = ((1 - proj.y) / 2 * window.innerHeight) + 'px';
+    f.el.style.left = ((proj.x + 1) / 2 * appW) + 'px';
+    f.el.style.top = ((1 - proj.y) / 2 * appH) + 'px';
     f.el.style.opacity = Math.min(1, f.life / f.max * 2.5);
   }
 }
@@ -241,7 +259,7 @@ window.addEventListener('keydown', (e) => {
   if (k === 'ArrowLeft' || k === 'a' || k === 'A') input.left = true;
   if (k === 'ArrowRight' || k === 'd' || k === 'D') input.right = true;
   if (k === ' ' || k === 'z' || k === 'Z') { e.preventDefault(); audio.init(); if (state === 'play') input.key = true; }
-  if (k === 'Enter' && !e.repeat) { audio.init(); if (state === 'title') startGame(); else if (state === 'result') $('resNext').click(); }
+  if (k === 'Enter' && !e.repeat) { audio.init(); if (state === 'title' && audio.ready) startGame(); else if (state === 'result') $('resNext').click(); }
   if ((k === 'p' || k === 'P' || k === 'Escape') && !e.repeat) togglePause();
   if ((k === 'm' || k === 'M') && !e.repeat) toggleSound();
 });
@@ -262,7 +280,7 @@ function refreshBest() {
   $('bestHud').textContent = best.score.toLocaleString();
 }
 refreshBest();
-$('startBtn').addEventListener('click', () => { audio.init(); startGame(); });
+$('startBtn').addEventListener('click', () => { if (!audio.ready) return; audio.init(); startGame(); });
 $('howBtn').addEventListener('click', () => { audio.init(); show('how', true); });
 $('howClose').addEventListener('click', () => show('how', false));
 $('soundBtn').addEventListener('click', () => { audio.init(); toggleSound(); });
@@ -307,6 +325,7 @@ function beginStage(i) {
   setModel(FORMS[G.form].lv);
   state = 'play';
   $('stageName').textContent = `第${i + 1}天 ${STAGES[i].name}`;
+  world.refreshEnv(altM());
   banner(`第${i + 1}天`, STAGES[i].name);
   audio.gong();
 }
@@ -319,16 +338,21 @@ function toTitle() {
 }
 function clearWorldObjects() {
   if (!G) return;
-  for (const c of G.coins) scene.remove(c.obj);
+  for (const c of G.coins) freeCoin(c);
   for (const f of G.foes) { scene.remove(f.obj); if (f.warn) f.warn.remove(); }
 }
 
 // ---------- 生成：仏像の上に連なる硬貨の道 ----------
 const STEP = 2.0; // 道の硬貨の間隔（ユニット）：1枚ずつはっきり離す
+// 硬貨は使い回す（毎回作ると、スマホで引っかかりの原因になる）
+const coinPool = { zeni: [], koban: [], goriyaku: [], noroi: [] };
+function freeCoin(c) { c.obj.visible = false; coinPool[c.type].push(c.obj); }
 function addCoin(type, x, y, z = 0) {
   x = THREE.MathUtils.clamp(x, -XB, XB);
-  const obj = makeCoinMesh(type);
-  obj.position.set(x, y, z); obj.scale.setScalar(1.15); scene.add(obj);
+  let obj = coinPool[type].pop();
+  if (!obj) { obj = makeCoinMesh(type); scene.add(obj); }
+  obj.visible = true;
+  obj.position.set(x, y, z); obj.scale.setScalar(1.15);
   G.coins.push({ type, obj, x, y, z, vx: 0, vy: 0, spin: Math.random() * 6, ph: Math.random() * 6, pulled: false });
 }
 // 硬貨の道は左右の「車線」を通る。真ん中を通るのは車線を移るときだけなので、左右に動かないと取れない
@@ -450,7 +474,7 @@ function update(dt) {
   const S = bScale();
 
   // 左右移動
-  const unitsPerPx = (2 * viewHalfH * camera.aspect) / window.innerWidth;
+  const unitsPerPx = (2 * viewHalfH * camera.aspect) / appW;
   if (input.dragPx) { const dx = input.dragPx * unitsPerPx * 1.25; G.bx += dx; G.bvx = dx / Math.max(dt, 1e-3); input.dragPx = 0; }
   else if (input.left || input.right) { G.bvx += ((input.right - input.left) * 9 - G.bvx) * Math.min(1, dt * 10); G.bx += G.bvx * dt; }
   else G.bvx *= Math.pow(0.02, dt);
@@ -542,8 +566,8 @@ function update(dt) {
     if (c.pulled) c.z += (-0.35 - c.z) * Math.min(1, dt * 6); // 仏像より奥を通って頭上へ
     const grab = sucking ? 0.45 * S + COINS[c.type].r * 0.3 : 0.55 * S;
     const gd = sucking ? d : Math.hypot(G.bx - c.x, G.by + 1.0 * S - c.y);
-    if (gd < grab) { absorb(c); scene.remove(c.obj); G.coins.splice(i, 1); continue; }
-    if (c.y < G.camY - viewHalfH - 4) { scene.remove(c.obj); G.coins.splice(i, 1); continue; }
+    if (gd < grab) { absorb(c); freeCoin(c); G.coins.splice(i, 1); continue; }
+    if (c.y < G.camY - viewHalfH - 4) { freeCoin(c); G.coins.splice(i, 1); continue; }
     c.obj.position.set(c.x, c.y + (c.pulled ? 0 : Math.sin(c.ph) * 0.06), c.z);
     const shrink = c.pulled ? THREE.MathUtils.clamp(d / 1.6, 0.2, 1) : 1; // 頭上で小さくなって消える
     c.obj.scale.setScalar(1.15 * shrink);
@@ -559,7 +583,7 @@ function update(dt) {
       if (f.warnT > 0) { // 警告中はまだ飛んでこない
         f.warnT -= dt;
         proj.set(0, f.y, 0.3).project(camera);
-        f.warn.style.top = ((1 - proj.y) / 2 * window.innerHeight) + 'px';
+        f.warn.style.top = ((1 - proj.y) / 2 * appH) + 'px';
         if (f.warnT <= 0) { f.warn.remove(); f.warn = null; }
         continue;
       }
@@ -697,7 +721,7 @@ function gameOver(reason = '') {
   state = 'result'; resultKind = 'over';
   input.down = input.key = false;
   saveBest();
-  audio.tone(220, 0.6, 'triangle', 0.1, 0, -120); audio.tone(165, 1.0, 'triangle', 0.1, 0.3, -80);
+  audio.over();
   $('resTitle').textContent = reason ? 'カラスに激突…' : '墜落…';
   $('resAlt').textContent = Math.floor(G.maxAlt || altM()).toLocaleString() + 'm';
   $('resMoney').textContent = G.money.toLocaleString();
@@ -912,9 +936,19 @@ function updateMotesFor(cy) {
 
 // ---------- ループ ----------
 let last = performance.now();
+let fpsAcc = 0, fpsN = 0, fpsT = 0;
+function adaptQuality(dt) {
+  if (state !== 'play') { fpsAcc = fpsN = fpsT = 0; return; }
+  fpsAcc += dt; fpsN++; fpsT += dt;
+  if (fpsT < 2.5) return;
+  const fps = fpsN / fpsAcc; fpsAcc = fpsN = fpsT = 0;
+  if (fps < 48 && quality < QUALITY.length - 1) { quality++; resize(); }
+}
 function loop(now) {
-  const dt = Math.min(0.05, (now - last) / 1000);
+  const rawDt = (now - last) / 1000;
+  const dt = Math.min(0.05, rawDt);
   last = now;
+  adaptQuality(Math.min(0.2, rawDt));
   if (G && state === 'play') { update(dt); }
   if (G && state === 'play') updateHUD();
   if (G && state === 'result') { // 結果画面では仏像の周りをゆっくり回る

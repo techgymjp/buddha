@@ -1,5 +1,40 @@
 // 3Dモデル：仏像（5形態）、硬貨（4種）、カラス、雷雲
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+
+/**
+ * 動かない部品を材質ごとに1つのメッシュへまとめる（描画回数を大幅に減らしてスマホでも軽くする）
+ * keep に入れたオブジェクトとその子はまとめない
+ */
+export function mergeStatic(root, keep = new Set()) {
+  root.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(root.matrixWorld).invert();
+  const buckets = new Map(), remove = [];
+  const m = new THREE.Matrix4();
+  root.traverse((o) => {
+    if (!o.isMesh || o.isInstancedMesh || Array.isArray(o.material) || keep.has(o)) return;
+    for (let a = o.parent; a && a !== root; a = a.parent) if (keep.has(a)) return;
+    if (o.matrixWorld.determinant() < 0) return; // 鏡像はそのまま
+    let g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
+    const useColor = !!o.material.vertexColors;
+    for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(k) && !(useColor && k === 'color')) g.deleteAttribute(k);
+    if (!g.attributes.normal) g.computeVertexNormals();
+    if (!g.attributes.uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
+    g.clearGroups();
+    g.morphAttributes = {};
+    m.multiplyMatrices(inv, o.matrixWorld); g.applyMatrix4(m);
+    const key = o.material.uuid + (useColor ? 'c' : '');
+    if (!buckets.has(key)) buckets.set(key, { mat: o.material, geos: [], order: o.renderOrder });
+    buckets.get(key).geos.push(g); remove.push(o);
+  });
+  for (const o of remove) o.parent.remove(o);
+  for (const { mat, geos, order } of buckets.values()) {
+    const merged = mergeGeometries(geos, false);
+    if (!merged) continue;
+    const mesh = new THREE.Mesh(merged, mat); mesh.renderOrder = order; root.add(mesh);
+  }
+  return root;
+}
 
 const SERIF = '"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP","Noto Serif CJK JP","WenQuanYi Zen Hei",serif';
 
@@ -360,6 +395,8 @@ export function buildBuddha(lv) {
     root.userData.glow = glow;
   }
 
+  mergeStatic(halo);
+  mergeStatic(root, new Set([mouth, lipU, lipL, halo]));
   root.userData = { ...root.userData, mouth, lipU, lipL, halo, body, lv, mouthLocal: V(0, 1.85, 0.42) };
   root.traverse((o) => { if (o.isMesh) { o.castShadow = false; } });
   return root;
@@ -520,17 +557,18 @@ export const COIN_MODELS = (() => {
   return { zeni: tenpo, noroi: kanei, koban, goriyaku };
 })();
 
+export const GLOW_MATS = Object.fromEntries(['goriyaku', 'noroi', 'koban'].map((type) => [type, new THREE.SpriteMaterial({
+  map: glowTexture, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  color: type === 'noroi' ? 0x8a20ff : type === 'koban' ? 0xffc860 : 0xffd060,
+  opacity: type === 'noroi' ? 0.8 : type === 'koban' ? 0.35 : 0.9,
+})]));
 export function makeCoinMesh(type) {
   const m = COIN_MODELS[type];
   const mesh = new THREE.Mesh(m.geo, m.mats);
   const g = new THREE.Group(); g.add(mesh);
   g.userData.mesh = mesh;
   if (type === 'goriyaku' || type === 'noroi' || type === 'koban') {
-    const s = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: glowTexture, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-      color: type === 'noroi' ? 0x8a20ff : type === 'koban' ? 0xffc860 : 0xffd060,
-      opacity: type === 'noroi' ? 0.8 : type === 'koban' ? 0.35 : 0.9,
-    }));
+    const s = new THREE.Sprite(GLOW_MATS[type]);
     const sc = type === 'goriyaku' ? 2.6 : type === 'koban' ? 1.6 : 1.5;
     s.scale.set(sc, sc, 1); g.add(s); g.userData.glow = s;
   }

@@ -1,6 +1,6 @@
 // 世界：空、光、雲、寺院、山頂の懸造り、雲海、天空、極楽浄土
 import * as THREE from 'three';
-import { canvasTex, glowTexture, dotTexture, buildBuddha, MAT } from './models.js?v=202611101733';
+import { canvasTex, glowTexture, dotTexture, buildBuddha, MAT, mergeStatic } from './models.js?v=202611101738';
 
 export const UNIT_M = 6; // 1ユニット = 6m
 
@@ -34,6 +34,10 @@ export class World {
     this.buildKiyomizu();
     this.buildClouds();
     this.buildPureLand();
+    // 動かない景色を材質ごとにまとめて描画回数を減らす
+    mergeStatic(this.temple);
+    mergeStatic(this.kiyomizu);
+    mergeStatic(this.pureLand, this.lotusSet);
   }
 
   // ---------- 空 ----------
@@ -119,15 +123,18 @@ export class World {
     this.sky.position.copy(camPos); this.stars.position.copy(camPos);
 
     // 環境マップ（金属の映り込み）を時々作り直す
-    if (Math.abs(altM - this.envAlt) > 120) {
-      this.envAlt = altM;
-      const old = this.env;
-      this.env = this.pmrem.fromScene(this.envScene, 0.02);
-      this.scene.environment = this.env.texture;
-      this.scene.environmentIntensity = 0.75;
-      if (old) old.dispose();
-    }
+    if (!this.env) this.refreshEnv(altM);
     for (const f of this.animated) f(t, camPos);
+  }
+
+  // 環境マップ（金属の映り込み）を作り直す。重い処理なのでステージの切り替え時だけ行う
+  refreshEnv(altM) {
+    this.envAlt = altM;
+    const old = this.env;
+    this.env = this.pmrem.fromScene(this.envScene, 0.02);
+    this.scene.environment = this.env.texture;
+    this.scene.environmentIntensity = 0.75;
+    if (old) old.dispose();
   }
 
   // ---------- 寺院の境内 ----------
@@ -359,7 +366,7 @@ export class World {
 
   // 清水の舞台風の懸造り
   buildKiyomizu() {
-    const g = new THREE.Group(); g.position.set(70, 0, -260); this.scene.add(g);
+    const g = new THREE.Group(); g.position.set(70, 0, -260); this.scene.add(g); this.kiyomizu = g;
     const wood = new THREE.MeshStandardMaterial({ color: 0x5a4030, roughness: 0.9 });
     const top = 376;
     // 舞台の背後にそびえる山（舞台はこの斜面に張り出して建つ）
@@ -436,7 +443,7 @@ export class World {
       sp.position.set(x, y, z); sp.scale.set(s, s * 0.6, 1); this.scene.add(sp); return sp;
     };
     // 各高度の雲
-    for (let i = 0; i < 170; i++) {
+    for (let i = 0; i < 110; i++) {
       const y = 12 + Math.random() * 1090;
       const near = Math.random() < 0.12;
       const z = near ? 4 + Math.random() * 8 : -70 - Math.random() * 300;
@@ -446,7 +453,7 @@ export class World {
       if (near) { sp.material = sp.material.clone(); sp.material.opacity = 0.4; this.passClouds.push(sp); }
     }
     // 山頂の下に広がる雲海
-    for (let i = 0; i < 90; i++) {
+    for (let i = 0; i < 45; i++) {
       const a = Math.random() * Math.PI * 2, r = 120 + Math.random() * 380;
       add(white, Math.cos(a) * r, 292 + Math.random() * 10, -Math.abs(Math.sin(a) * r * 0.8) - 80, 50 + Math.random() * 70);
     }
@@ -455,12 +462,12 @@ export class World {
     const sea = new THREE.Mesh(new THREE.PlaneGeometry(2400, 2400), new THREE.MeshBasicMaterial({ map: seaTex, color: 0xf4f7fb, transparent: true, opacity: 0.95, depthWrite: false }));
     sea.rotation.x = -Math.PI / 2; sea.position.set(0, 300, -300); this.scene.add(sea);
     // 雲海ステージ：入道雲の塔
-    for (let t = 0; t < 14; t++) {
+    for (let t = 0; t < 10; t++) {
       const x = (Math.random() - 0.5) * 300, z = -80 - Math.random() * 220;
-      for (let k = 0; k < 12; k++) add(white, x + (Math.random() - 0.5) * 30, 460 + k * 20 + Math.random() * 12, z + (Math.random() - 0.5) * 20, 50 + Math.random() * 40);
+      for (let k = 0; k < 8; k++) add(white, x + (Math.random() - 0.5) * 30, 460 + k * 20 + Math.random() * 12, z + (Math.random() - 0.5) * 20, 50 + Math.random() * 40);
     }
     // 極楽浄土の雲の床
-    for (let i = 0; i < 180; i++) {
+    for (let i = 0; i < 90; i++) {
       const a = Math.random() * Math.PI * 2, r = 60 + Math.random() * 460;
       add(Math.random() < 0.6 ? pink : [gold], Math.cos(a) * r, 1080 + Math.random() * 40 + (Math.random() < 0.3 ? Math.random() * 300 : 0), Math.sin(a) * r * 0.7 - 200, 50 + Math.random() * 90);
     }
@@ -468,12 +475,12 @@ export class World {
 
   // ---------- 極楽浄土 ----------
   buildPureLand() {
-    const g = new THREE.Group(); this.scene.add(g);
+    const g = new THREE.Group(); this.scene.add(g); this.pureLand = g; this.lotusSet = new Set();
     // 雲間に浮かぶ巨大な黄金の仏
     const giant = buildBuddha(5);
     giant.scale.setScalar(80); giant.position.set(0, 1060, -560);
     giant.traverse((o) => { if (o.material && o.material.fog !== undefined) { /* 霧で薄れすぎないように */ } });
-    g.add(giant); this.giant = giant;
+    g.add(giant); this.giant = giant; this.lotusSet.add(giant);
     // 宮殿
     const palaceY = 1200;
     for (const [x, z, s] of [[0, -160, 1.4], [-70, -200, 1], [75, -210, 1], [-140, -260, 0.8], [150, -270, 0.8]]) {
@@ -500,7 +507,7 @@ export class World {
       f.position.set(side * (10 + Math.random() * 60), 1120 + Math.random() * 400, -10 - Math.random() * 120);
       f.scale.setScalar(1 + Math.random() * 2.5);
       f.rotation.x = 0.3;
-      g.add(f);
+      g.add(f); this.lotusSet.add(f);
       const ph = Math.random() * 6;
       this.animated.push((t) => { f.rotation.y = t * 0.0002 + ph; f.position.y += Math.sin(t * 0.001 + ph) * 0.005; });
     }
