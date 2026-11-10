@@ -4,9 +4,9 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { buildBuddha, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611101835';
-import { World, UNIT_M, makeLightPillars } from './world.js?v=202611101835';
-import { AudioEngine } from './audio.js?v=202611101835';
+import { buildBuddha, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611101840';
+import { World, UNIT_M, makeLightPillars } from './world.js?v=202611101840';
+import { AudioEngine } from './audio.js?v=202611101840';
 
 const $ = (id) => document.getElementById(id);
 const store = {
@@ -303,7 +303,7 @@ let G = null;
 function newGameState() {
   return {
     stage: 0, money: 0, score: 0, form: 0, maxCombo: 0, henshins: 0,
-    bx: 0, by: 1.2, bvx: 0, v: 14, camY: 2.4, mouth: 0, danger: 0, beatT: 0,
+    bx: 0, by: 0.35, bvx: 0, v: 0, camY: 1.6, mouth: 0, danger: 0, beatT: 0, launch: 0.9, launchedAt: 0,
     coins: [], foes: [], path: null, foeAcc: 0, accSm: 0, thrust: 0, lift: 0,
     combo: 0, comboT: 0, gori: 0, curse: 0, inv: 0, dai: 0,
     fever: false, feverCount: 0, stageMoney: 0, fovKick: 0, shake: 0, time: 0,
@@ -373,18 +373,14 @@ function newSegment(P) {
 // カラスは実際の高度に配置し、その高度で左右を行き来する（仏像についてこない）
 const CROW_GAP = [14, 12, 11, 10, 15]; // カラスどうしの高さの間隔（ユニット）
 function placeCrows(limitY) {
-  if (G.nextCrowY == null) G.nextCrowY = G.by + 9;
+  if (G.nextCrowY == null) G.nextCrowY = G.by + 30; // 最初のカラスは十分上から
   while (G.nextCrowY < limitY) {
     const y = G.nextCrowY;
     G.nextCrowY += CROW_GAP[G.stage] * (0.75 + Math.random() * 0.6);
     if (G.fever || !STAGES[G.stage].foes.includes('crow')) continue;
-    const dir = Math.random() < 0.5 ? 1 : -1;
-    const obj = makeCrow(); obj.scale.setScalar(1.3); scene.add(obj);
-    // 行き来するのは画面の一部だけ（必ずどこかに通り抜けられる隙間がある）
-    const cx = (Math.random() < 0.5 ? -1 : 1) * (1 + Math.random() * 3), range = 1.5 + Math.random() * 1.5;
-    const x = cx + (Math.random() - 0.5) * range;
-    obj.position.set(x, y, 0.3); obj.rotation.y = dir > 0 ? 0 : Math.PI;
-    G.foes.push({ kind: 'crow', obj, x, y, cx, range, vx: dir * (1.2 + Math.random() * 1.4 + G.stage * 0.2), vy: 0, bob: 0.3 + Math.random() * 0.4, t: Math.random() * 6, r: 0.5 });
+    // その高度が画面に入ってきたら、画面の端から飛び始めて横切る
+    const obj = makeCrow(); obj.scale.setScalar(1.3); obj.visible = false; scene.add(obj);
+    G.foes.push({ kind: 'crow', obj, x: 0, y, vx: 0, vy: 0, waiting: true, speed: 2.4 + Math.random() * 2 + G.stage * 0.3, bob: 0.25 + Math.random() * 0.3, t: Math.random() * 6, r: 0.5 });
   }
 }
 function extendPath(limitY) {
@@ -502,6 +498,17 @@ function update(dt) {
   G.sucking = sucking;
   G.mouth += ((sucking ? 1 : 0) - G.mouth) * Math.min(1, dt * 12);
 
+  // スタート：賽銭鉢の上でかがんで力をため、地面を蹴ってジャンプ
+  if (G.launch > 0) {
+    G.launch -= dt;
+    if (G.launch > 0) return;
+    G.v = 26; G.launchedAt = G.time; G.surge = 1.6; G.fovKick += 8; G.shake = 0.3;
+    audio.stomp(); flash(0.15);
+    shockwave(G.bx, G.by - 0.7, 0xfff0c0, 8);
+    emit(G.bx, G.by - 0.7, 0, 0xffe0a0, 60, 6, 0.9);
+    emit(G.bx, G.by - 0.8, 0, 0xd8c8a0, 30, 4, 0.8, 4);
+  }
+
   // 上昇の勢い：吸った硬貨で加速し、吸わなければ重力で減速する
   if (G.dai > 0) G.v += 25 * dt;
   else G.v += ((G.gori > 0 ? 18 * Math.min(1, G.gori / 2) : 0) - st.grav) * dt; // 黄金の御利益コインで加速度が増す
@@ -542,7 +549,7 @@ function update(dt) {
   G.thrust = Math.max(G.gori > 0 || G.dai > 0 ? 1.2 : 0, G.thrust - dt * 2.2);
   G.surge = (G.surge || 0) * Math.pow(0.002, dt);
   // 画面は一定の速さで上へ進み続ける（最初の数秒はゆっくり始まる）
-  const ramp = Math.min(1, G.time / 4);
+  const ramp = Math.min(1, (G.time - G.launchedAt) / 4);
   G.camY += (st.scroll * ramp / UNIT_M) * dt;
   // 速ければ画面ごと押し上げる（仏像は画面の中ほどより上には行かない）
   if (G.by > G.camY - 1.2) G.camY = G.by + 1.2;
@@ -608,9 +615,14 @@ function update(dt) {
         if (f.y < G.camY - viewHalfH - 4) { scene.remove(f.obj); G.foes.splice(i, 1); }
         continue;
       }
-      f.x += f.vx * dt; f.y += (f.vy + Math.sin(f.t * 3) * (f.bob || 0.6)) * dt;
-      const lim = f.range != null ? f.range : XB + 0.6, base = f.cx || 0;
-      if (Math.abs(f.x - base) > lim) { f.x = base + Math.sign(f.x - base) * lim; f.vx = -f.vx; f.obj.rotation.y = f.vx > 0 ? 0 : Math.PI; } // 決まった範囲で折り返す
+      if (f.waiting) { // まだ画面に入っていない高度のカラスは待機
+        if (f.y > G.camY + viewHalfH + 1) continue;
+        const dir = Math.random() < 0.5 ? 1 : -1;
+        f.waiting = false; f.x = -dir * (XB + 3); f.vx = dir * f.speed;
+        f.obj.visible = true; f.obj.rotation.y = dir > 0 ? 0 : Math.PI;
+      }
+      f.x += f.vx * dt; f.y += Math.sin(f.t * 3) * f.bob * dt; // 一定の高度をまっすぐ横切る
+      if (Math.abs(f.x) > XB + 5) { scene.remove(f.obj); G.foes.splice(i, 1); continue; } // 反対側へ抜けた
       f.obj.position.set(f.x, f.y, 0.3);
       const flap = Math.sin(f.t * 16) * 0.9;
       f.obj.userData.wings[0].rotation.x = -flap; f.obj.userData.wings[1].rotation.x = flap;
@@ -850,7 +862,8 @@ function frameVisuals(dt, t) {
   const surge = G.surge || 0;
   buddhaRoot.position.set(bx, by + bob + surge * 0.55, 0);
   G.baseS = (G.baseS || S) + (S - (G.baseS || S)) * Math.min(1, dt * 3);
-  buddhaRoot.scale.set(G.baseS * (1 - surge * 0.035), G.baseS * (1 + surge * 0.08), G.baseS * (1 - surge * 0.035)); // 上へ伸びる
+  const crouch = G.launch > 0 ? Math.min(1, (0.9 - G.launch) / 0.6) : 0; // スタート前にかがむ
+  buddhaRoot.scale.set(G.baseS * (1 - surge * 0.035 + crouch * 0.07), G.baseS * (1 + surge * 0.08 - crouch * 0.18), G.baseS * (1 - surge * 0.035 + crouch * 0.07)); // 上へ伸びる
   // 左右に動くと進む方向へ向きを変え、少し傾く（止まると正面に戻る）
   const yawTarget = THREE.MathUtils.clamp(G.bvx * 0.11, -1.1, 1.1);
   G.yaw = (G.yaw || 0) + (yawTarget - (G.yaw || 0)) * Math.min(1, dt * 6);
