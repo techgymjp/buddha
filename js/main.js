@@ -4,10 +4,10 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { buildBuddha, buildSkin, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611102106';
-import { World, UNIT_M, makeLightPillars } from './world.js?v=202611102106';
-import { t, lang, setLang, applyStatic } from './i18n.js?v=202611102106';
-import { AudioEngine } from './audio.js?v=202611102106';
+import { buildBuddha, buildSkin, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611102110';
+import { World, UNIT_M, makeLightPillars } from './world.js?v=202611102110';
+import { t, lang, setLang, applyStatic } from './i18n.js?v=202611102110';
+import { AudioEngine } from './audio.js?v=202611102110';
 
 const $ = (id) => document.getElementById(id);
 const store = {
@@ -39,6 +39,7 @@ const COINS = {
 };
 // 物理の定数（m/s, m/s²）
 const PHYS = { g: 16, drag: 0.0042, camDown: 1.5 /* ユニット/秒 */ }; // 重力は強め：取り逃すとすぐ落ちる
+const STOMP_JUMP_M = 80; // カラスを踏んだときに跳ね上がる高さ（m）
 const FEVER_AT = 0.82, HENSHIN_NEED = 14;
 const XB = 5.6;           // 左右の移動範囲
 const VIEW_H = 17.5, VIEW_W = 12;
@@ -856,19 +857,10 @@ function update(dt) {
           f.dead = true; f.vy = -4; f.vx = (f.x - G.bx) * 2 + (Math.random() - 0.5) * 2;
           G.chain = G.time - (G.lastStomp ?? -9) < 3 ? (G.chain || 0) + 1 : 1; G.lastStomp = G.time;
           const ch = Math.min(G.chain, 7);
-          // 落下の勢いを跳ね返す（速く落ちていたほど高く跳ね、連鎖で倍率がかかる）
-          const impact = Math.max(0, -G.v);
-          let vb = Math.max(22, impact * 1.3 + 14) * (1 + (ch - 1) * 0.25);
-          // 上の硬貨の道まで確実に届く跳躍力を与える（吸い込み範囲のすぐ下まで跳べば道に戻れる）
-          let nextY = Infinity;
-          for (const c of G.coins) if (c.y > G.by + 1 && c.y < nextY) nextY = c.y;
-          if (nextY < Infinity) {
-            const h = Math.max(0, (nextY - G.by) * UNIT_M - 12);          // 必要な高さ（m）
-            const g = PHYS.g * Math.sqrt(hardness());
-            vb = Math.max(vb, Math.sqrt(2 * g * h) * 1.2 + 6);             // 空気抵抗の分も見込んで2割増し
-          }
-          G.v = Math.min(vb, 120);
-          G.anti = 0.6; G.antiA = PHYS.g * Math.sqrt(hardness());         // 跳ねた直後は重力を打ち消す
+          // 踏みつけの跳ね返りは一律：落下の速さに関係なく、いつも同じ高さだけ跳ね上がる
+          const g = PHYS.g * Math.sqrt(hardness());
+          G.v = Math.sqrt(2 * g * STOMP_JUMP_M) * 1.2;               // 空気抵抗の分を上乗せ（実測でちょうど80m）
+          G.anti = 0;
           // カラスが小判をばらまく（吸い込めばお寺へのお金）
           for (let k = 0; k < 2 + ch; k++) addCoin(k === 0 || Math.random() < 0.6 ? 'koban' : 'zeni', f.x + (Math.random() - 0.5) * 2.4, f.y + 0.6 + Math.random() * 2.5);
           // 3連鎖で大仏に変身
