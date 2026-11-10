@@ -1,6 +1,6 @@
 // 世界：空、光、雲、寺院、山頂の懸造り、雲海、天空、極楽浄土
 import * as THREE from 'three';
-import { canvasTex, glowTexture, dotTexture, buildBuddha, MAT, mergeStatic } from './models.js?v=202611102110';
+import { canvasTex, glowTexture, dotTexture, buildBuddha, MAT, mergeStatic } from './models.js?v=202611102118';
 
 export const UNIT_M = 6; // 1ユニット = 6m
 
@@ -303,6 +303,25 @@ export class World {
   // 寄進の状況に応じて境内の建物を出す
   setBuilt(built) {
     for (const [k, part] of Object.entries(this.parts)) part.visible = built.includes(k);
+  }
+  // 建物ごとの見どころ（建立の演出でカメラが向かう場所）[カメラの位置, 注視点]
+  get partViews() {
+    return {
+      sanmon: [[14, 8, -10], [0, 2, -40]],
+      lanterns: [[16, 6, 6], [0, 2, -20]],
+      hondo: [[30, 22, -22], [0, 14, -62]],
+      shoro: [[52, 20, -32], [30, 15, -52]],
+      pagoda: [[-10, 40, -20], [-20, 28, -80]],
+      daibutsuden: [[40, 42, -70], [0, 30, -130]],
+    };
+  }
+  // 建物が地面からせり上がる（k: 0→1）
+  raise(id, k) {
+    const part = this.parts[id]; if (!part) return;
+    if (part.userData.baseY == null) part.userData.baseY = part.position.y;
+    const e = 1 - Math.pow(1 - Math.min(1, k), 3);
+    part.visible = true;
+    part.position.y = part.userData.baseY - 14 * (1 - e);
   }
 
   makePagoda(tiers, w) {

@@ -212,3 +212,8 @@ body { display: flex; align-items: center; justify-content: center; }
 .skins .skin { padding: 8px 12px; font-size: clamp(13px, 3.8cqw, 15px); }
 .skins .skin.sel { background: linear-gradient(180deg, #ffd780, #e38a16); color: #fff; border-color: #ffe9a8; }
 .skins .skin:disabled { opacity: .5; }
+
+/* お寺の画面：上半分で境内を見渡せるよう、下にまとめる */
+#templeScr { justify-content: flex-end; padding-bottom: max(14px, env(safe-area-inset-bottom)); background: linear-gradient(180deg, rgba(20,8,2,0) 30%, rgba(20,8,2,.5)); transition: opacity .35s; }
+#templeScr .card { max-height: 58cqh; gap: 8px; }
+#templeScr.cine { opacity: 0; pointer-events: none; }

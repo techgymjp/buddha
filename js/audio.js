@@ -234,8 +234,6 @@ export class AudioEngine {
       const base = 1318 * Math.pow(2, lv / 12);
       this.buf['chime' + lv] = await offline(1.6, (c, d) => { metal(c, d, 0.005, base, 0.22, 1.0); metal(c, d, 0.075, base * 1.5, 0.18, 1.0); if (lv >= 3) metal(c, d, 0.145, base * 2, 0.14, 1.2); });
     });
-    tasks.push(async () => { this.buf.musicBase = await renderMusic(this, 'base'); });
-    tasks.push(async () => { this.buf.musicJhala = await renderMusic(this, 'jhala'); });
     for (let i = 0; i < tasks.length; i++) {
       await tasks[i]();
       onProgress((i + 1) / tasks.length);
@@ -243,7 +241,18 @@ export class AudioEngine {
     }
     this.convertAll();
     this.ready = true;
-    if (this.ctx && !this.musicStarted) this.startMusic();
+    this.prepareMusic(); // BGMは待たずに裏で作り、できたら流し始める
+  }
+
+  // BGMを裏で書き出す（音声専用の処理なので、画面やプレイを止めない）
+  async prepareMusic() {
+    try {
+      this.buf.musicBase = await renderMusic(this, 'base');
+      this.buf.musicJhala = await renderMusic(this, 'jhala');
+      this.convertAll();
+      this.musicReady = true;
+      if (this.ctx && !this.musicStarted) this.startMusic();
+    } catch (e) { /* BGMが作れなくても遊べる */ }
   }
 
   // ---------- 再生の準備（ユーザー操作の中で呼ぶ） ----------
@@ -306,9 +315,10 @@ export class AudioEngine {
   // ---------- BGM：書き出しておいた曲をループ再生するだけ（描画が重くても途切れない） ----------
   startMusic() {
     const ctx = this.ctx;
-    if (!this.ready || !this.buf.musicBase || this.buf.musicBase.raw2) return;
+    if (!this.musicReady || !this.buf.musicBase || this.buf.musicBase.raw2) return;
     this.musicStarted = true;
     const t = ctx.currentTime + 0.1;
+    this.music.gain.setValueAtTime(0.0001, t); this.music.gain.exponentialRampToValueAtTime(0.6, t + 3); // 静かに流れ始める
     const base = ctx.createBufferSource(); base.buffer = this.buf.musicBase; base.loop = true;
     const jhala = ctx.createBufferSource(); jhala.buffer = this.buf.musicJhala; jhala.loop = true;
     this.jhalaGain = ctx.createGain(); this.jhalaGain.gain.value = 0;

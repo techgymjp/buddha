@@ -4,10 +4,10 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { buildBuddha, buildSkin, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611102110';
-import { World, UNIT_M, makeLightPillars } from './world.js?v=202611102110';
-import { t, lang, setLang, applyStatic } from './i18n.js?v=202611102110';
-import { AudioEngine } from './audio.js?v=202611102110';
+import { buildBuddha, buildSkin, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611102118';
+import { World, UNIT_M, makeLightPillars } from './world.js?v=202611102118';
+import { t, lang, setLang, applyStatic } from './i18n.js?v=202611102118';
+import { AudioEngine } from './audio.js?v=202611102118';
 
 const $ = (id) => document.getElementById(id);
 const store = {
@@ -102,8 +102,8 @@ const formLabel = (f) => skin !== 'buddha' ? `Lv.${f.lv} ${t('skins')[SKINS.inde
 updateSoundBtns();
 // 音はゲーム開始前にすべて作っておく（スマホで音が切れないように）
 $('startBtn').disabled = true;
-audio.preload((k) => { $('startBtn').textContent = t('loading', { p: Math.round(k * 100) }); }).then(() => {
-  warmUp();
+audio.preload((k) => { $('startBtn').textContent = t('loading', { p: Math.round(k * 80) }); }).then(async () => {
+  await warmUp((k) => { $('startBtn').textContent = t('finishing', { p: 80 + Math.round(k * 20) }); });
   $('startBtn').disabled = false; $('startBtn').textContent = t('start');
 });
 
@@ -147,10 +147,11 @@ function perks() {
 
 // ---------- 下準備：途中で初めて出る物を、ゲーム開始前に用意しておく ----------
 // （スマホでは、初めて描く物の準備に0.1〜0.3秒かかり、プレイ中だとカクッと止まるため）
-function warmUp() {
+async function warmUp(onProgress = () => {}) {
+  const idle = () => new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0))); // 1体ごとに画面を更新する
   try {
     const tmp = new THREE.Group(); scene.add(tmp);
-    for (let lv = 1; lv <= 5; lv++) { if (!modelCache[lv]) modelCache[lv] = buildBuddha(lv); }   // 進化する仏像を全部作っておく
+    for (let lv = 1; lv <= 5; lv++) { if (!modelCache[lv]) modelCache[lv] = buildBuddha(lv); onProgress(lv / 7); await idle(); } // 進化する仏像を全部作っておく
     if (skin !== 'buddha' && !modelCache[skin]) modelCache[skin] = buildSkin(skin);
     const show = [...Object.values(modelCache).filter((m) => m !== model), ghost];
     for (let i = 0; i < 2; i++) crowPool.n.push(getCrow(false)); crowPool.g.push(getCrow(true));
@@ -158,7 +159,10 @@ function warmUp() {
     for (let i = 0; i < 6; i++) { const m = new THREE.Mesh(RING_OUT, new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false })); scene.add(m); m.visible = false; shockPool.push(m); show.push(m); }
     for (const m of show) { if (!m.parent) tmp.add(m); m.visible = true; }
     for (const o of [...crowPool.n, ...crowPool.g]) o.visible = true;
-    renderer.compile(scene, camera);                     // 描画プログラムをまとめて準備
+    onProgress(6 / 7); await idle();
+    // 描画プログラムの準備（使えれば画面を止めない非同期の準備）
+    if (renderer.compileAsync) await renderer.compileAsync(scene, camera); else renderer.compile(scene, camera);
+    onProgress(1);
     for (const m of show) m.visible = false;
     for (const o of [...crowPool.n, ...crowPool.g]) o.visible = false;
     for (const m of Object.values(modelCache)) if (m.parent === tmp) tmp.remove(m);
@@ -366,8 +370,12 @@ function refreshBest() {
 refreshBest();
 $('startBtn').addEventListener('click', () => { if (!audio.ready) return; audio.init(); startGame(); });
 $('langBtn').addEventListener('click', () => { setLang(lang === 'ja' ? 'en' : 'ja'); updateSoundBtns(); refreshBest(); if (audio.ready) $('startBtn').textContent = t('start'); hudCache = {}; });
-$('templeBtn').addEventListener('click', () => { audio.init(); renderTemple(); show('templeScr', true); });
-$('templeClose').addEventListener('click', () => show('templeScr', false));
+$('templeBtn').addEventListener('click', () => { audio.init(); renderTemple(); show('templeScr', true); show('title', false); templeView = true; });
+$('templeClose').addEventListener('click', () => { show('templeScr', false); show('title', true); templeView = false; });
+// お寺の画面を開いている間は境内を見渡す。寄進した瞬間は建物へカメラが向かい、建物がせり上がる
+let templeView = false, buildCine = null;
+const camCur = new THREE.Vector3(0, 3, 16), lookCur = new THREE.Vector3(0, 5, 0);
+const OVERVIEW = [[0, 90, 120], [0, 0, 3]];
 function renderTemple() {
   $('wallet').textContent = '¥' + temple.wallet.toLocaleString();
   const next = BUILDINGS.findIndex((b) => !hasB(b.id));
@@ -380,7 +388,10 @@ function renderTemple() {
     const b = BUILDINGS.find((x) => x.id === el.dataset.b);
     if (!b || temple.wallet < b.cost) return;
     temple.wallet -= b.cost; temple.built.push(b.id); store.set('temple', temple);
-    world.setBuilt(temple.built); audio.gong(); flash(0.4); vib([30, 40, 60]);
+    world.setBuilt(temple.built.filter((x) => x !== b.id)); // 建立の演出でせり上がらせる
+    buildCine = { id: b.id, t: 0 };
+    $('templeScr').classList.add('cine');                    // 演出の間はお寺の画面を隠す
+    audio.gong(); vib([30, 40, 60]);
     renderTemple();
   }));
   $('skinList').innerHTML = SKINS.map((k, i) => {
@@ -1102,8 +1113,28 @@ function frameVisuals(dt, t) {
     buddhaRoot.rotation.set(0, Math.sin(titleT * 0.3) * 0.25, 0);
     const a = titleT * 0.12;
     camera.fov = 50; camera.updateProjectionMatrix();
-    camera.position.set(Math.sin(a) * 9 / ZOOM, by + 1.2 + (ZOOM - 1) * 0.6, (16 + Math.cos(a) * 2) / ZOOM);
-    lookAt.set(0, by + 3.6 - (ZOOM - 1) * 1.0, 0); camera.lookAt(lookAt);
+    let wantPos, wantLook;
+    if (buildCine) {
+      // 建立の演出：建物へカメラが向かい、建物が光とともにせり上がる
+      buildCine.t += dt;
+      const [vp, vl] = world.partViews[buildCine.id];
+      wantPos = new THREE.Vector3(...vp); wantLook = new THREE.Vector3(...vl);
+      const rk = (buildCine.t - 0.7) / 1.3;
+      if (rk > 0) {
+        world.raise(buildCine.id, rk);
+        if (!buildCine.fx) { buildCine.fx = true; flash(0.35); audio.level(); shockwave(vl[0], vl[1] - 6, 0xfff0c0, 18); }
+        if (rk < 1 && Math.random() < 0.8) emit(vl[0] + (Math.random() - 0.5) * 16, vl[1] - 8 + Math.random() * 10, vl[2] + (Math.random() - 0.5) * 10, 0xffe6a0, 3, 4, 1.2);
+      }
+      if (buildCine.t > 2.8) { buildCine = null; $('templeScr').classList.remove('cine'); renderTemple(); }
+    } else if (templeView) {
+      wantPos = new THREE.Vector3(...OVERVIEW[0]); wantLook = new THREE.Vector3(...OVERVIEW[1]); // 境内全体を見渡す
+    } else {
+      wantPos = new THREE.Vector3(Math.sin(a) * 9 / ZOOM, by + 1.2 + (ZOOM - 1) * 0.6, (16 + Math.cos(a) * 2) / ZOOM);
+      wantLook = new THREE.Vector3(0, by + 3.6 - (ZOOM - 1) * 1.0, 0);
+    }
+    const ease = Math.min(1, dt * (buildCine ? 2.2 : templeView ? 2 : 3));
+    camCur.lerp(wantPos, ease); lookCur.lerp(wantLook, ease);
+    camera.position.copy(camCur); camera.lookAt(lookCur);
     // 上に連なる硬貨が渦を巻いて口へ吸い込まれる
     if (titleCoins.length < 46 && Math.random() < 0.45) {
       const types = ['zeni', 'zeni', 'zeni', 'koban', 'zeni', 'goriyaku'];
