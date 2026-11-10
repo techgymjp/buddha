@@ -86,6 +86,8 @@ export const MAT = {
   woodDark: new THREE.MeshStandardMaterial({ color: 0xb98a55, map: woodTex, roughness: 0.7 }),
   gold: new THREE.MeshPhysicalMaterial({ color: 0xf5b847, metalness: 1, roughness: 0.24, clearcoat: 0.6, clearcoatRoughness: 0.15, emissive: 0x2a1400, emissiveIntensity: 0.5 }),
   goldWarm: new THREE.MeshPhysicalMaterial({ color: 0xe0953a, metalness: 1, roughness: 0.3, clearcoat: 0.4, emissive: 0x2a1000, emissiveIntensity: 0.5 }),
+  // 黒漆：深い黒に艶のある塗膜
+  lacquer: new THREE.MeshPhysicalMaterial({ color: 0x0c0907, metalness: 0, roughness: 0.18, clearcoat: 1, clearcoatRoughness: 0.04, reflectivity: 0.6, envMapIntensity: 1.4 }),
   goldGreat: new THREE.MeshPhysicalMaterial({ color: 0xf7c04e, metalness: 1, roughness: 0.17, clearcoat: 1, clearcoatRoughness: 0.08, emissive: 0x2e1800, emissiveIntensity: 0.6 }),
   dark: new THREE.MeshStandardMaterial({ color: 0x1a0d04, roughness: 0.6 }),
   lotus: new THREE.MeshPhysicalMaterial({ color: 0xf7b2cd, roughness: 0.45, sheen: 1, sheenColor: new THREE.Color(0xffe0ee), emissive: 0x401020, emissiveIntensity: 0.25 }),
@@ -158,12 +160,13 @@ function boatHaloGeometry(h, wdt, flames) {
 export function buildBuddha(lv) {
   const root = new THREE.Group();
   const body = new THREE.Group(); root.add(body);
-  const mat = lv === 1 ? MAT.wood : lv === 4 ? MAT.goldWarm : lv === 5 ? MAT.goldGreat : MAT.gold;
+  const mat = lv === 1 ? MAT.wood : lv === 2 ? MAT.lacquer : lv === 4 ? MAT.goldWarm : lv === 5 ? MAT.goldGreat : MAT.gold;
+  const haloMat = lv === 2 ? MAT.gold : mat; // 黒漆の仏像は金の光背
   const hairMat = mat;
 
   // --- 蓮台 ---
   const ped = new THREE.Group(); body.add(ped);
-  const petalMat = lv === 1 ? MAT.wood : lv === 5 ? MAT.goldGreat : MAT.lotus;
+  const petalMat = lv === 1 ? MAT.wood : lv === 5 ? MAT.goldGreat : lv === 2 ? MAT.gold : MAT.lotus;
   // [枚数, 半径, 高さ, 外への傾き]
   const tiers = [[18, 0.9, -0.05, 0.55], [18, 0.84, -0.22, 0.95], [14, 0.72, -0.38, 1.25]];
   tiers.forEach(([n, r, y, lean], ti) => {
@@ -278,8 +281,8 @@ export function buildBuddha(lv) {
   } else {
     const big = lv >= 3;
     // 頭光：輪＋放射状の光条
-    halo.add(new THREE.Mesh(new THREE.TorusGeometry(0.6, 0.04, 8, 64), mat));
-    halo.add(new THREE.Mesh(new THREE.TorusGeometry(0.66, 0.02, 8, 64), mat));
+    halo.add(new THREE.Mesh(new THREE.TorusGeometry(0.6, 0.04, 8, 64), haloMat));
+    halo.add(new THREE.Mesh(new THREE.TorusGeometry(0.66, 0.02, 8, 64), haloMat));
     if (lv !== 4) {
       const spokes = lv === 2 ? 48 : 72;
       const inner = 0.7, outer = lv === 2 ? 1.75 : lv === 3 ? 2.9 : 2.4;
@@ -287,12 +290,12 @@ export function buildBuddha(lv) {
       for (let i = 0; i < spokes; i++) {
         const a = i / spokes * Math.PI * 2;
         const len = (outer - inner) * (i % 2 ? 0.72 : 1);
-        const rod = new THREE.Mesh(rodGeo, mat);
+        const rod = new THREE.Mesh(rodGeo, haloMat);
         rod.scale.y = len;
         rod.position.set(Math.cos(a) * (inner + len / 2), Math.sin(a) * (inner + len / 2), 0);
         rod.rotation.z = a - Math.PI / 2;
         halo.add(rod);
-        if (i % 2 === 0) { const tip = new THREE.Mesh(sphLow, mat); tip.scale.setScalar(0.035); tip.position.set(Math.cos(a) * (inner + len), Math.sin(a) * (inner + len), 0); halo.add(tip); }
+        if (i % 2 === 0) { const tip = new THREE.Mesh(sphLow, haloMat); tip.scale.setScalar(0.035); tip.position.set(Math.cos(a) * (inner + len), Math.sin(a) * (inner + len), 0); halo.add(tip); }
       }
     }
     if (big) {

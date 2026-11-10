@@ -362,16 +362,52 @@ export class World {
     const g = new THREE.Group(); g.position.set(62, 0, -112); this.scene.add(g);
     const wood = new THREE.MeshStandardMaterial({ color: 0x5a4030, roughness: 0.9 });
     const top = 188;
-    const pg = new THREE.CylinderGeometry(0.45, 0.45, 1, 8);
+    // 舞台の背後にそびえる山（舞台はこの斜面に張り出して建つ）
+    const H = 240, R = 110, apexY = top + 14, apexZ = -14;
+    const slopeY = (x, z) => apexY - (H / R) * Math.hypot(x, z - apexZ); // 斜面の高さ
+    const geo = new THREE.ConeGeometry(R, H, 72, 24, true);
+    const pos = geo.attributes.position, col = [], c = new THREE.Color();
+    for (let i = 0; i < pos.count; i++) {
+      const vx = pos.getX(i), vy = pos.getY(i), vz = pos.getZ(i);
+      const hr = (vy + H / 2) / H, ang = Math.atan2(vz, vx);
+      const n = Math.sin(ang * 7 + 1) * 0.03 + Math.sin(ang * 17) * 0.015;
+      pos.setXYZ(i, vx * (1 + n), vy, vz * (1 + n));
+      if (hr > 0.55 && Math.random() < 0.35) c.setHex(0x6e6a5e); else c.setHex(0x2d4a2b).lerp(new THREE.Color(0x46623a), Math.random() * 0.6);
+      col.push(c.r, c.g, c.b);
+    }
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    geo.computeVertexNormals();
+    const mount = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, flatShading: true }));
+    mount.position.set(0, apexY - H / 2, apexZ); g.add(mount);
+    // 懸造り：柱は斜面まで届く
+    const pg = new THREE.CylinderGeometry(0.45, 0.5, 1, 8);
     for (let i = 0; i < 7; i++) for (let j = 0; j < 5; j++) {
       const x = -12 + i * 4, z = 4 + j * 4;
-      const len = 26 + j * 4;
+      const len = top - slopeY(x, z) + 1.5;
       const p = new THREE.Mesh(pg, wood); p.scale.y = len; p.position.set(x, top - len / 2, z); g.add(p);
     }
-    for (let k = 0; k < 6; k++) { const b = new THREE.Mesh(new THREE.BoxGeometry(28, 0.5, 0.5), wood); b.position.set(0, top - 4 - k * 5, 20); g.add(b); }
+    for (let k = 0; k < 8; k++) { // 貫（横木）
+      const y = top - 4 - k * 6;
+      for (let j = 0; j < 5; j++) {
+        const z = 4 + j * 4;
+        if (slopeY(0, z) > y - 1) continue;
+        const bm = new THREE.Mesh(new THREE.BoxGeometry(25, 0.45, 0.45), wood); bm.position.set(0, y, z); g.add(bm);
+      }
+    }
     const deck = new THREE.Mesh(new THREE.BoxGeometry(30, 1, 20), new THREE.MeshStandardMaterial({ color: 0x8a6a4a, roughness: 0.8 })); deck.position.set(0, top, 12); g.add(deck);
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(30, 0.3, 0.3), wood); rail.position.set(0, top + 1.6, 21.8); g.add(rail);
     const hall = this.makeHall(26, 16, 7, 0x6a3020, 1); hall.position.set(0, top + 0.5, 4); g.add(hall);
-    for (let i = 0; i < 4; i++) { const tr = this.makeSakura(1.2); tr.position.set(-20 + Math.random() * 8, top - 18 + i * 3, -6 + Math.random() * 8); g.add(tr); }
+    // 斜面の杉と桜
+    const cedarMat = new THREE.MeshStandardMaterial({ color: 0x24402a, roughness: 1 });
+    const cg = new THREE.ConeGeometry(2.2, 10, 7);
+    for (let i = 0; i < 70; i++) {
+      const ang = -Math.PI * 0.95 + Math.random() * Math.PI * 0.9 + Math.PI; // 手前側の斜面
+      const r = 22 + Math.random() * 70;
+      const x = Math.cos(ang) * r, z = apexZ - Math.sin(ang) * r;
+      if (Math.abs(x) < 16 && z > -6 && z < 24) continue; // 舞台の下は空ける
+      const t = new THREE.Mesh(cg, cedarMat); t.position.set(x, slopeY(x, z) + 4, z); t.scale.setScalar(0.8 + Math.random() * 0.8); g.add(t);
+    }
+    for (const [x, z] of [[-20, 2], [18, 0], [-24, 12], [22, 14]]) { const tr = this.makeSakura(1.1); tr.position.set(x, slopeY(x, z) - 0.5, z); g.add(tr); }
   }
 
   // ---------- 雲 ----------
