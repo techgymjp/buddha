@@ -4,10 +4,10 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { buildBuddha, buildSkin, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611110059';
-import { World, UNIT_M, ALT_M, makeLightPillars } from './world.js?v=202611110059';
-import { t, lang, setLang, applyStatic } from './i18n.js?v=202611110059';
-import { AudioEngine } from './audio.js?v=202611110059';
+import { buildBuddha, buildSkin, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611110116';
+import { World, UNIT_M, ALT_M, makeLightPillars } from './world.js?v=202611110116';
+import { t, lang, setLang, applyStatic } from './i18n.js?v=202611110116';
+import { AudioEngine } from './audio.js?v=202611110116';
 
 const $ = (id) => document.getElementById(id);
 const store = {
@@ -62,6 +62,8 @@ FORCE_LV = Math.max(0, Math.min(5, parseInt(new URLSearchParams(location.search)
 // 画質レベル（重ければ自動で下げる）：[解像度の上限, ブルームの有無]
 const QUALITY = [[1.75, true], [1.4, true], [1.15, true], [1.0, false], [0.8, false]];
 let quality = isMobile ? 2 : 0;
+let SHOT = false; // ストア用の撮影（Web 版だけ）：?shot=1 で高解像度・画質を落とさない
+SHOT = !!new URLSearchParams(location.search).get('shot'); if (SHOT) { QUALITY[0][0] = 3; quality = 0; } // @web-only
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, QUALITY[quality][0]));
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 0.92;
@@ -1438,6 +1440,7 @@ function updateMotesFor(cy) {
 let last = performance.now();
 let fpsAcc = 0, fpsN = 0, fpsT = 0;
 function adaptQuality(dt) {
+  if (SHOT) return;
   if (state !== 'play') { fpsAcc = fpsN = fpsT = 0; return; }
   fpsAcc += dt; fpsN++; fpsT += dt;
   if (fpsT < 2.5) return;
@@ -1474,4 +1477,4 @@ function loop(now) {
 requestAnimationFrame(loop);
 
 // 動作確認用
-window.__buddha = { get state() { return state; }, get G() { return G; }, input, setModel, world, camera, scene, renderer, composer, step(n, dt = 1 / 60) { for (let i = 0; i < n && state === 'play'; i++) update(dt); }, restart() { show('result', false); startGame(); } }; // @web-only
+window.__buddha = { get state() { return state; }, get G() { return G; }, input, setModel, world, camera, scene, renderer, composer, step(n, dt = 1 / 60) { for (let i = 0; i < n && state === 'play'; i++) update(dt); }, restart() { show('result', false); startGame(); }, calm() { for (const w of shockwaves) { w.m.visible = false; shockPool.push(w.m); } shockwaves.length = 0; parts.length = 0; flashV = 0; $('flash').style.opacity = 0; bannerT = 0; $('banner').style.opacity = 0; if (G) Object.assign(G, { fovKick: 0, shake: 0, surge: 0, lift: 0, accSm: 0, thrust: 0, combo: 0, prevV: G.v }); } }; // @web-only
