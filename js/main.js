@@ -4,10 +4,10 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { buildBuddha, buildSkin, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611110012';
-import { World, UNIT_M, ALT_M, makeLightPillars } from './world.js?v=202611110012';
-import { t, lang, setLang, applyStatic } from './i18n.js?v=202611110012';
-import { AudioEngine } from './audio.js?v=202611110012';
+import { buildBuddha, buildSkin, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611110032';
+import { World, UNIT_M, ALT_M, makeLightPillars } from './world.js?v=202611110032';
+import { t, lang, setLang, applyStatic } from './i18n.js?v=202611110032';
+import { AudioEngine } from './audio.js?v=202611110032';
 
 const $ = (id) => document.getElementById(id);
 const store = {
@@ -475,6 +475,17 @@ document.addEventListener('visibilitychange', () => {
   } else if (!Ads.showing) AppSound.resume();
 });
 
+// 広告の処理が返ってこなくてもゲームが止まらないようにする：
+// 広告が表示されていないまま 5 秒たったら先へ進む（表示中は閉じられるまで待つ。最長 90 秒）
+function adSafe(p, fallback) {
+  return new Promise((res) => {
+    let done = false; const t0 = Date.now();
+    const fin = (v) => { if (!done) { done = true; res(v === undefined ? fallback : v); } };
+    Promise.resolve(p).then(fin, () => fin(fallback));
+    const chk = () => { if (done) return; if (!Ads.showing && Date.now() - t0 > 5000) fin(fallback); else setTimeout(chk, 500); };
+    setTimeout(chk, 500); setTimeout(() => fin(fallback), 90000);
+  });
+}
 // 全画面広告：「プレイを始める」「トップに戻る」「ポーズからの再開」「もう一度」のたびに出す
 let adBusy = false;
 async function withInterstitial(next) {
@@ -482,7 +493,7 @@ async function withInterstitial(next) {
   if (Ads.available) {
     adBusy = true;
     show('pause', false); show('result', false); show('how', false);
-    await Ads.showInterstitial(3000);
+    await adSafe(Ads.showInterstitial(3000));
     adBusy = false;
   }
   next();
@@ -537,7 +548,7 @@ $('reviveWatch').addEventListener('click', async () => {
   revive.busy = true;
   $('reviveWatch').disabled = true;
   $('reviveWatch').textContent = t('reviveLoading');
-  const result = await Ads.showRewarded();
+  const result = await adSafe(Ads.showRewarded(), 'unavailable');
   if (result === 'unavailable') { $('reviveNote').textContent = t('reviveFail'); setTimeout(closeRevive, 2000); return; }
   if (result !== 'rewarded') { closeRevive(); return; }
   revive.active = false; show('revive', false);
@@ -570,7 +581,10 @@ function updateBanner() {
 // タイトル画面の下に、バージョン・プライバシーポリシー・広告の設定（EU など）を出す（アプリだけ）
 if (NATIVE) {
   $('legal').hidden = false;
-  if (window.APP_VERSION && window.APP_VERSION !== 'dev') $('buildInfo').textContent = window.APP_VERSION;
+  const ver = window.APP_VERSION && window.APP_VERSION !== 'dev' ? window.APP_VERSION : '';
+  // 動作確認用 APK（テスト広告）では、広告の状態もバージョンの横に出す
+  const showVer = () => { $('buildInfo').textContent = ver + (window.AD_MODE !== 'production' ? ` · ads: ${Ads.status}` : ''); };
+  showVer(); setInterval(showVer, 2000);
   Ads.initDone.then(() => { if (Ads.privacyOptionsRequired) $('adPrivacy').hidden = false; });
   $('adPrivacyLink').addEventListener('click', (e) => { e.preventDefault(); Ads.showPrivacyOptions(); });
 }

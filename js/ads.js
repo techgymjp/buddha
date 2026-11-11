@@ -43,6 +43,9 @@ window.Ads = (() => {
   const has = (kind) => !!ids[kind];
   if (!has('interstitial') && !has('rewarded') && !has('banner')) AdMob = null;
 
+  // 待ちすぎない：決められた時間で返ってこなければ fallback を返す（広告のせいでゲームが止まらないように）
+  const within = (p, ms, fallback) => Promise.race([Promise.resolve(p).catch(() => fallback), new Promise((r) => setTimeout(() => r(fallback), ms))]);
+  let status = AdMob ? 'init' : 'off';  // 動作確認用 APK でタイトルに出す広告の状態
   let ready = false;           // 広告をリクエストしてよい状態（初期化と同意確認が済んだ）
   let showing = false;
   let privacyRequired = false; // 「広告の設定」を利用者が開けるようにする必要があるか（EU など）
@@ -84,15 +87,14 @@ window.Ads = (() => {
   }
 
   async function init() {
-    try {
-      await AdMob.initialize({ initializeForTesting: testing });
-    } catch (e) {
-      return;
-    }
+    const ok = await within(AdMob.initialize({ initializeForTesting: testing }).then(() => true), 10000, false);
+    if (!ok) { status = 'init-failed'; return; }
+    status = 'consent';
     // EU・英国などで必要な広告の同意確認（必要な地域でだけフォームが出る）。
     // 確認自体が失敗した場合（AdMob 側でメッセージ未設定など）は、同意不要の地域とみなして続ける
     try {
-      let consent = await AdMob.requestConsentInfo();
+      let consent = await within(AdMob.requestConsentInfo(), 10000, null);
+      if (!consent) throw new Error('consent timeout');
       if (consent.status === 'REQUIRED' && consent.isConsentFormAvailable) consent = await AdMob.showConsentForm();
       ready = consent.canRequestAds !== false;
       privacyRequired = consent.privacyOptionsRequirementStatus === 'REQUIRED';
@@ -114,6 +116,7 @@ window.Ads = (() => {
     AdMob.addListener('onRewardedVideoAdReward', () => { rewarded = true; });
     AdMob.addListener('onRewardedVideoAdDismissed', () => finish('reward', rewarded));
     AdMob.addListener('onRewardedVideoAdFailedToShow', () => finish('reward', false));
+    status = ready ? 'ready' : 'no-consent';
     prepare('inter');
     prepare('reward');
     syncBanner();
@@ -122,7 +125,7 @@ window.Ads = (() => {
   // 全画面広告を表示し、閉じられたら resolve する（読み込めていないときは最大 timeout ミリ秒だけ待ち、だめなら出さずに resolve）
   async function showInterstitial(timeout = 0) {
     if (!AdMob || showing || !has('interstitial')) return;
-    await initDone;
+    await within(initDone, 1500);
     if (!ready || !(await ensureLoaded('inter', timeout))) return;
     showing = true; slots.inter.loaded = false;
     window.AppSound && AppSound.suspend();
@@ -136,7 +139,7 @@ window.Ads = (() => {
   // リワード広告を表示する。結果は 'rewarded'（最後まで見た）/ 'skipped'（途中で閉じた）/ 'unavailable'（読み込めなかった）
   async function showRewarded() {
     if (!AdMob || showing || !has('rewarded')) return 'unavailable';
-    await initDone;
+    await within(initDone, 1500);
     if (!ready || !(await ensureLoaded('reward', 8000))) return 'unavailable';
     showing = true; slots.reward.loaded = false;
     window.AppSound && AppSound.suspend();
@@ -194,6 +197,7 @@ window.Ads = (() => {
     get available() { return !!AdMob; },
     get canReward() { return !!AdMob && has('rewarded'); },  // リワード広告(チート)を出せるか
     get showing() { return showing; },
+    get status() { return status + (slots.inter.loaded ? ' I' : '') + (slots.reward.loaded ? ' R' : '') + (banner.state === 'shown' ? ' B' : ''); },
     get privacyOptionsRequired() { return privacyRequired; },
     initDone,
     showInterstitial,
