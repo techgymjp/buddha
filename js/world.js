@@ -1,6 +1,6 @@
 // 世界：空、光、雲、寺院、山頂の懸造り、雲海、天空、極楽浄土
 import * as THREE from 'three';
-import { canvasTex, glowTexture, dotTexture, buildBuddha, MAT, mergeStatic } from './models.js?v=202611110116';
+import { canvasTex, glowTexture, dotTexture, buildBuddha, MAT, mergeStatic } from './models.js?v=202611110131';
 
 export const UNIT_M = 6; // 景色：1ユニット = 6m
 export const ALT_M = 2;  // 高度計：仏像が1ユニット昇ると2m（景色は昇る速さの1/3で流れる）
@@ -504,9 +504,10 @@ export class World {
       const y = 12 + Math.random() * 1090;
       const near = Math.random() < 0.12;
       const z = near ? 4 + Math.random() * 8 : -70 - Math.random() * 300;
-      const x = near ? (Math.random() < 0.5 ? -1 : 1) * (7 + Math.random() * 10) : (Math.random() - 0.5) * 500;
+      // すれ違う雲は画面の端だけを流れる（仏像を隠さないように）
+      const x = near ? (Math.random() < 0.5 ? -1 : 1) * (12 + Math.random() * 8) : (Math.random() - 0.5) * 500;
       const mats = y > 1080 ? pink : y > 760 && y < 940 ? [gold] : white;
-      const sp = add(mats, x, y, z, near ? 10 + Math.random() * 10 : 40 + Math.random() * 90);
+      const sp = add(mats, x, y, z, near ? 8 + Math.random() * 6 : 40 + Math.random() * 90);
       if (near) { sp.material = sp.material.clone(); sp.material.opacity = 0.4; this.passClouds.push(sp); }
     }
     // 山頂の下に広がる雲海
