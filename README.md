@@ -100,3 +100,36 @@
 - `js/audio.js` … BGMと効果音の合成
 - `js/i18n.js` … 日本語 / English の文言
 - `vendor/` … [three.js](https://threejs.org/) r170（MIT ライセンス、`vendor/THREE_LICENSE`）
+- `fonts/` … 同梱フォント（Dela Gothic One・Zen Old Mincho。ゲームで使う文字だけに絞ったもの、SIL Open Font License）
+- `js/ads.js` … Google AdMob の広告（Android アプリのときだけ動く。Web 版では何もしない）
+- `android/` … Android アプリ（Capacitor）
+
+## Android アプリ
+
+[Capacitor](https://capacitorjs.com/) で Android アプリにしています（パッケージ名 `jp.techgym.buddha`、縦画面・全画面）。ゲームのファイルはアプリに同梱しているので、オフラインでも遊べます。
+
+- 動作確認用 APK（テスト広告）：リリース画面 https://github.com/techgymjp/buddha/releases/tag/android-latest
+- APK を直接ダウンロード：https://github.com/techgymjp/buddha/releases/latest/download/buddha.apk
+
+スマホで下の QR コードを読み取ると、リリース画面が開きます（Android 端末で `buddha.apk` をタップしてインストール。「提供元不明のアプリ」の許可が必要です）。
+
+![APK のリリース画面の QR コード](docs/apk-qr.png)
+
+アプリだけの機能：
+
+- 広告（AdMob）：バナーはトップ・遊び方・ポーズ・結果画面の下中央だけ。全画面広告は「スタート」「トップに戻る」「ポーズからの再開」「もう一度遊ぶ」のたび
+- リワード広告：墜落したとき、広告を見ればその高さから復活できる（1 ゲーム 1 回。結果画面とシェア文に「復活 1回」と出る）
+- 戻るボタン：プレイ中はポーズ（ポーズ中なら再開）、トップ・結果画面ではアプリを閉じる
+- 別のアプリに切り替えたら自動でポーズし、音も止める
+- シェアは Android の共有メニュー。タイトル画面にバージョン・プライバシーポリシー・広告の設定（EU など）を表示
+
+ビルドは GitHub Actions（`.github/workflows/android.yml`）で行います。既定のブランチに push すると APK が上のリリース画面に載り、署名鍵が Secrets に登録されていれば Google Play 用の AAB（本番広告）が Artifact に上がります。
+
+```bash
+npm ci
+npm run android:sync   # www/ を作って android/ にコピー（テスト広告）
+```
+
+## ライセンス
+
+著作権はテックジム株式会社に帰属します（All rights reserved）。許可なく複製・改変・再配布すること、Web サイトやアプリ（Google Play、App Store など）として公開・販売すること、名前・ロゴ・アイコン・画像を使うことを禁止します。テックジムの受講生が学習目的で複製・改変することは許可しますが、アプリストアでの公開・広告の掲載・販売などの商用利用は禁止し、著作権表示を残してください。詳しくは [LICENSE](LICENSE) をご覧ください。同梱の three.js（MIT）とフォント（SIL Open Font License）はそれぞれのライセンスのままです。

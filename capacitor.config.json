@@ -1,0 +1,8 @@
+{
+  "appId": "jp.techgym.buddha",
+  "appName": "空飛ぶ仏像",
+  "webDir": "www",
+  "android": {
+    "backgroundColor": "#1a0d04"
+  }
+}

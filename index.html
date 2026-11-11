@@ -6,10 +6,7 @@
 <title>空飛ぶ仏像</title>
 <meta name="description" content="お金を吸い込め！仏の力で天まで昇れ！ 仏像が賽銭・小判・硬貨を吸い込み、そのエネルギーで天へ昇っていく3Dブラウザゲーム">
 <meta name="theme-color" content="#1a0d04">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Old+Mincho:wght@700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=202611102356">
+<link rel="stylesheet" href="style.css?v=202611110012">
 <script type="importmap">
 { "imports": { "three": "./vendor/three.module.min.js", "three/addons/": "./vendor/addons/" } }
 </script>
@@ -62,6 +59,11 @@
       <button class="btn round" id="langBtn" type="button" data-i18n="langBtn">English</button>
     </div>
     <div class="best" id="bestTitle"></div>
+    <div class="legal" id="legal" hidden>
+      <span id="buildInfo"></span>
+      <a id="privacyLink" href="https://techgym.jp/privacy-policy/" target="_blank" rel="noopener" data-i18n="privacy">プライバシーポリシー</a>
+      <span id="adPrivacy" hidden>｜<a href="#" id="adPrivacyLink" data-i18n="adSettings">広告の設定</a></span>
+    </div>
   </div>
 </section>
 
@@ -104,6 +106,14 @@
   </div>
 </section>
 
+<section id="revive" class="screen hidden">
+  <div class="card">
+    <p class="revive-note" id="reviveNote"></p>
+    <button class="btn gold-btn" id="reviveWatch" type="button">▶ 広告を見て復活する</button>
+    <button class="btn round" id="reviveNext" type="button">つぎへ</button>
+  </div>
+</section>
+
 <section id="pause" class="screen hidden">
   <div class="card">
     <h2 class="gold" data-i18n="pause">一時停止</h2>
@@ -116,6 +126,9 @@
 <div id="nogl" class="screen hidden"><div class="card"><h2 class="gold" data-i18n="noglTitle">WebGLが使えません</h2><p data-i18n="noglText">このゲームは3D表示（WebGL）に対応したブラウザで遊べます。</p></div></div>
 
 </div>
-<script type="module" src="js/main.js?v=202611102356"></script>
+<script src="js/build-info.js"></script>
+<script src="js/ads-config.js"></script>
+<script src="js/ads.js?v=202611110012"></script>
+<script type="module" src="js/main.js?v=202611110012"></script>
 </body>
 </html>

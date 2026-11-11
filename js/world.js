@@ -1,6 +1,6 @@
 // 世界：空、光、雲、寺院、山頂の懸造り、雲海、天空、極楽浄土
 import * as THREE from 'three';
-import { canvasTex, glowTexture, dotTexture, buildBuddha, MAT, mergeStatic } from './models.js?v=202611102356';
+import { canvasTex, glowTexture, dotTexture, buildBuddha, MAT, mergeStatic } from './models.js?v=202611110012';
 
 export const UNIT_M = 6; // 景色：1ユニット = 6m
 export const ALT_M = 2;  // 高度計：仏像が1ユニット昇ると2m（景色は昇る速さの1/3で流れる）

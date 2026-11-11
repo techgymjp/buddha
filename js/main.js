@@ -4,10 +4,10 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { buildBuddha, buildSkin, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611102356';
-import { World, UNIT_M, ALT_M, makeLightPillars } from './world.js?v=202611102356';
-import { t, lang, setLang, applyStatic } from './i18n.js?v=202611102356';
-import { AudioEngine } from './audio.js?v=202611102356';
+import { buildBuddha, buildSkin, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611110012';
+import { World, UNIT_M, ALT_M, makeLightPillars } from './world.js?v=202611110012';
+import { t, lang, setLang, applyStatic } from './i18n.js?v=202611110012';
+import { AudioEngine } from './audio.js?v=202611110012';
 
 const $ = (id) => document.getElementById(id);
 const store = {
@@ -54,8 +54,9 @@ try {
 }
 const isMobile = matchMedia('(pointer: coarse)').matches;
 // 確認用：URLに ?lv=1〜5 を付けると、タイトル画面にその形態の仏像を出す
-const ZOOM = Math.max(1, Math.min(3, parseFloat(new URLSearchParams(location.search).get('zoom')) || 1)); // 確認用：タイトルで仏像を拡大
-const FORCE_LV = Math.max(0, Math.min(5, parseInt(new URLSearchParams(location.search).get('lv'), 10) || 0));
+let ZOOM = 1, FORCE_LV = 0; // 確認用（Web 版だけ）：?zoom= でタイトルの仏像を拡大、?lv= で形態を指定
+ZOOM = Math.max(1, Math.min(3, parseFloat(new URLSearchParams(location.search).get('zoom')) || 1)); // @web-only
+FORCE_LV = Math.max(0, Math.min(5, parseInt(new URLSearchParams(location.search).get('lv'), 10) || 0)); // @web-only
 // 画質レベル（重ければ自動で下げる）：[解像度の上限, ブルームの有無]
 const QUALITY = [[1.75, true], [1.4, true], [1.15, true], [1.0, false], [0.8, false]];
 let quality = isMobile ? 2 : 0;
@@ -93,7 +94,7 @@ window.addEventListener('resize', resize);
 resize();
 
 const audio = new AudioEngine(store.get('muted', false));
-window.__audio = audio;
+window.__audio = audio; // @web-only
 function toggleSound() { audio.setMuted(!audio.muted); store.set('muted', audio.muted); updateSoundBtns(); }
 function updateSoundBtns() { for (const id of ['soundBtn', 'pauseSound']) $(id).textContent = audio.muted ? t('soundOff') : t('soundOn'); }
 applyStatic();
@@ -369,7 +370,7 @@ function refreshBest() {
   $('bestHud').textContent = best.alt.toLocaleString();
 }
 refreshBest();
-$('startBtn').addEventListener('click', () => { if (!audio.ready) return; audio.init(); startGame(); });
+$('startBtn').addEventListener('click', () => { if (!audio.ready) return; audio.init(); withInterstitial(startGame); });
 $('langBtn').addEventListener('click', () => { setLang(lang === 'ja' ? 'en' : 'ja'); updateSoundBtns(); refreshBest(); if (audio.ready) $('startBtn').textContent = t('start'); hudCache = {}; });
 $('templeBtn').addEventListener('click', () => { audio.init(); renderTemple(); show('templeScr', true); show('title', false); templeView = true; });
 $('templeClose').addEventListener('click', () => { show('templeScr', false); show('title', true); templeView = false; });
@@ -406,13 +407,13 @@ function renderTemple() {
 }
 world.setBuilt(temple.built);
 $('howBtn').addEventListener('click', () => { audio.init(); show('how', true); });
-$('howClose').addEventListener('click', () => show('how', false));
+$('howClose').addEventListener('click', () => withInterstitial(() => show('how', false)));
 $('soundBtn').addEventListener('click', () => { audio.init(); toggleSound(); });
 $('pauseSound').addEventListener('click', toggleSound);
 $('pauseBtn').addEventListener('click', togglePause);
-$('resumeBtn').addEventListener('click', togglePause);
-$('quitBtn').addEventListener('click', () => { show('pause', false); toTitle(); });
-$('resTitleBtn').addEventListener('click', toTitle);
+$('resumeBtn').addEventListener('click', resumeFromPause);
+$('quitBtn').addEventListener('click', () => withInterstitial(toTitle));
+$('resTitleBtn').addEventListener('click', () => withInterstitial(toTitle));
 $('shareBtn').addEventListener('click', () => shareRecord());
 // 結果を1枚の画像にしてシェア（使えなければ保存）
 async function shareRecord() {
@@ -435,23 +436,143 @@ async function shareRecord() {
   txt(`${alt.toLocaleString()}m`, 1010, 112, gold(910, 1020));
   txt(t('rankLabel', { r: rank(alt) }), 1085, 44, '#ffffff');
   txt(`${formLabel(form())}  ·  ¥${G.money.toLocaleString()}`, 1150, 32, '#ffe9c0');
-  txt(location.host + location.pathname.replace(/index\.html$/, ''), 1230, 26, '#ffd890');
+  txt(SITE_URL.replace(/^https:\/\//, '').replace(/\/$/, ''), 1230, 26, '#ffd890');
   const blob = await new Promise((res) => c.toBlob(res, 'image/png'));
   const file = new File([blob], 'flying-buddha.png', { type: 'image/png' });
-  const text = t('shareText', { m: alt.toLocaleString(), r: rank(alt) });
+  const text = t('shareText', { m: alt.toLocaleString(), r: rank(alt) }) + (G.revives ? ' ' + t('revived', { n: G.revives }) : '');
+  const nativeShare = plugin('Share');
+  if (nativeShare) { try { await nativeShare.share({ title: t('pageTitle'), text, url: SITE_URL, dialogTitle: t('share') }); } catch (e) { /* キャンセル */ } return; }
   try {
-    if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], text, url: location.href.split('?')[0] }); return; }
+    if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], text, url: SITE_URL }); return; }
   } catch (e) { if (e && e.name === 'AbortError') return; }
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'flying-buddha.png'; a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
-$('resNext').addEventListener('click', () => {
-  show('result', false); startGame();
-});
+$('resNext').addEventListener('click', () => withInterstitial(() => { show('result', false); startGame(); }));
 
 function togglePause() {
   if (state === 'play') { state = 'paused'; show('pause', true); }
   else if (state === 'paused') { state = 'play'; show('pause', false); }
+}
+
+// ---------- Android アプリ（Capacitor）----------
+// Web 版では Capacitor がないので、広告・戻るボタン・共有メニューは何もしない
+const NATIVE = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+const plugin = (name) => (NATIVE && window.Capacitor.Plugins ? window.Capacitor.Plugins[name] : null);
+const Ads = window.Ads || { available: false, canReward: false, showing: false, privacyOptionsRequired: false, initDone: Promise.resolve(), showInterstitial: async () => {}, showRewarded: async () => 'unavailable', setBanner() {}, showPrivacyOptions: async () => {} };
+const SITE_URL = 'https://techgymjp.github.io/buddha/';
+// 広告の表示中は音を止める（ads.js から呼ばれる）
+window.AppSound = {
+  suspend() { if (audio.ctx && audio.ctx.state === 'running') audio.ctx.suspend(); },
+  resume() { if (audio.ctx && audio.ctx.state === 'suspended' && !document.hidden) audio.ctx.resume(); },
+};
+// 別のアプリに切り替えたら一時停止して音を止める
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    input.left = input.right = input.down = input.key = false;
+    if (state === 'play') togglePause();
+    AppSound.suspend();
+  } else if (!Ads.showing) AppSound.resume();
+});
+
+// 全画面広告：「プレイを始める」「トップに戻る」「ポーズからの再開」「もう一度」のたびに出す
+let adBusy = false;
+async function withInterstitial(next) {
+  if (adBusy) return;
+  if (Ads.available) {
+    adBusy = true;
+    show('pause', false); show('result', false); show('how', false);
+    await Ads.showInterstitial(3000);
+    adBusy = false;
+  }
+  next();
+}
+function resumeFromPause() {
+  if (state !== 'paused') return;
+  withInterstitial(() => { if (state === 'paused') togglePause(); });
+}
+
+// 戻るボタン：プレイ中はポーズ（ポーズ中なら再開）、タイトル・結果画面ではアプリを閉じる
+if (plugin('App')) {
+  plugin('App').addListener('backButton', () => {
+    if (adBusy) return;
+    if (state === 'play') togglePause();
+    else if (state === 'paused') resumeFromPause();
+    else if (state === 'title') {
+      if (!$('how').classList.contains('hidden')) $('howClose').click();
+      else if (!$('templeScr').classList.contains('hidden')) { if (!buildCine) $('templeClose').click(); }
+      else plugin('App').exitApp();
+    } else if (state === 'result') plugin('App').exitApp();
+    else if (state === 'dying' && revive.active && !revive.busy) closeRevive();
+  });
+}
+
+// リワード広告：墜落したとき、広告を見ればその場から復活できる（1 ゲーム 1 回）
+// 墜落の様子を見届けられるよう少し待ってから案内を出し、数秒で自動的に結果画面へ進む
+const REVIVE_DELAY = 2.6, REVIVE_WAIT = 6, REVIVE_MAX = 1;
+const revive = { active: false, busy: false, t: 0 };
+function canRevive() { return Ads.canReward && (G.revives || 0) < REVIVE_MAX; }
+function showRevive() {
+  Object.assign(revive, { active: true, busy: false, t: REVIVE_WAIT });
+  $('reviveWatch').disabled = false;
+  $('reviveWatch').textContent = t('reviveWatch');
+  $('reviveNote').textContent = t('reviveNote');
+  $('reviveNext').textContent = t('reviveNext', { s: REVIVE_WAIT });
+  show('revive', true);
+}
+function closeRevive() { // 復活しないで結果画面へ
+  revive.active = false;
+  show('revive', false);
+  if (G && G.death) G.death.offer = false;
+}
+function updateRevive(dt) {
+  if (!revive.active || revive.busy) return;
+  revive.t -= dt;
+  $('reviveNext').textContent = t('reviveNext', { s: Math.max(0, Math.ceil(revive.t)) });
+  if (revive.t <= 0) closeRevive();
+}
+$('reviveNext').addEventListener('click', () => { if (revive.active && !revive.busy) closeRevive(); });
+$('reviveWatch').addEventListener('click', async () => {
+  if (!revive.active || revive.busy) return;
+  revive.busy = true;
+  $('reviveWatch').disabled = true;
+  $('reviveWatch').textContent = t('reviveLoading');
+  const result = await Ads.showRewarded();
+  if (result === 'unavailable') { $('reviveNote').textContent = t('reviveFail'); setTimeout(closeRevive, 2000); return; }
+  if (result !== 'rewarded') { closeRevive(); return; }
+  revive.active = false; show('revive', false);
+  doRevive();
+});
+// 墜落した高さから、光とともに大きく跳ね上がってやり直す
+function doRevive() {
+  const D = G.death;
+  G.revives = (G.revives || 0) + 1;
+  G.by = D.by; G.bx = THREE.MathUtils.clamp(D.bx, -XB + 1, XB - 1); G.bvx = 0;
+  G.camY = G.by + 1.4; G.spin = 0; G.death = null;
+  G.v = Math.sqrt(2 * PHYS.g * Math.sqrt(hardness()) * STOMP_JUMP_M) * 1.2; G.anti = 0;
+  G.inv = 2.5; G.danger = 0;
+  for (let i = G.foes.length - 1; i >= 0; i--) { const f = G.foes[i]; if (f.kind === 'crow' && Math.abs(f.y - G.by) < 10) { freeFoe(f); G.foes.splice(i, 1); } }
+  buddhaRoot.rotation.set(0, 0, 0);
+  setModel(G.dai > 0 ? 5 : FORMS[G.form].lv);
+  state = 'play';
+  flash(0.8); audio.henshin(); vib([30, 40, 60]);
+  emit(G.bx, G.by + 1.5, 0, 0xfff6a0, 120, 10, 1.2);
+  shockwave(G.bx, G.by + 1, 0xfff2b0, 12);
+}
+
+// バナー広告：トップ画面・遊び方・ポーズ・結果画面だけ（プレイ中は出さない）
+function updateBanner() {
+  const on = (state === 'title' && $('templeScr').classList.contains('hidden')) || state === 'paused' || state === 'result';
+  Ads.setBanner(on && !adBusy);
+  document.body.classList.toggle('with-banner', Ads.available && on);
+}
+
+// タイトル画面の下に、バージョン・プライバシーポリシー・広告の設定（EU など）を出す（アプリだけ）
+if (NATIVE) {
+  $('legal').hidden = false;
+  if (window.APP_VERSION && window.APP_VERSION !== 'dev') $('buildInfo').textContent = window.APP_VERSION;
+  Ads.initDone.then(() => { if (Ads.privacyOptionsRequired) $('adPrivacy').hidden = false; });
+  $('adPrivacyLink').addEventListener('click', (e) => { e.preventDefault(); Ads.showPrivacyOptions(); });
 }
 
 // ---------- ゲーム状態 ----------
@@ -468,7 +589,7 @@ function newGameState() {
 function startGame() {
   clearWorldObjects();
   G = newGameState();
-  G.rec = []; G.recT = 0;
+  G.rec = []; G.recT = 0; G.revives = 0;
   G.perk = perks(); G.charms = G.perk.charms;
   ghostRun = store.get('ghost3', null);
   setModel(1);
@@ -1005,7 +1126,7 @@ let resultKind = 'over';
 // ---------- やられ演出 ----------
 function startDeath(kind, crow) {
   state = 'dying';
-  G.death = { t: 0, kind, crow };
+  G.death = { t: 0, kind, crow, by: Math.max(G.by, G.camY - viewHalfH + 2), bx: G.bx };
   G.spin = 0;
   if (kind === 'crow') {
     audio.crowHit(); flash(0.6); G.shake = 1.4; G.danger = 1; vib([80, 40, 140]);
@@ -1044,6 +1165,9 @@ function updateDying(dt) {
     f.obj.position.set(f.x, f.y, 0.3); f.obj.rotation.y = f.vx > 0 ? 0 : Math.PI;
     const flap = Math.sin(f.t * 22) * 1.0; f.obj.userData.wings[0].rotation.x = -flap; f.obj.userData.wings[1].rotation.x = flap;
   }
+  // 広告で復活できるときは、墜落を見届けてから案内を出す（案内の間は結果画面に進まない）
+  if (D.offer == null && canRevive()) { if (D.t > REVIVE_DELAY) { D.offer = true; showRevive(); } return; }
+  if (D.offer) return;
   if (D.t > 1.8) gameOver(D.kind === 'crow' ? 'カラスに当たった！' : '');
 }
 function gameOver(reason = '') {
@@ -1063,7 +1187,7 @@ function gameOver(reason = '') {
   $('resAlt').textContent = alt.toLocaleString() + 'm';
   $('resMoney').textContent = G.money.toLocaleString();
   $('resRibbon').textContent = t('rankLabel', { r: rank(alt) });
-  $('resLines').innerHTML = [isBest ? `<b>${t('newBest')}</b>` : t('bestLine', { m: best.alt.toLocaleString() }), t('toTemple', { a: G.offer.toLocaleString(), w: temple.wallet.toLocaleString() })].join('<br>');
+  $('resLines').innerHTML = [isBest ? `<b>${t('newBest')}</b>` : t('bestLine', { m: best.alt.toLocaleString() }), t('toTemple', { a: G.offer.toLocaleString(), w: temple.wallet.toLocaleString() }), G.revives ? t('revived', { n: G.revives }) : ''].filter(Boolean).join('<br>');
   $('resNext').textContent = t('again');
   show('result', true); show('hud', false);
 }
@@ -1326,7 +1450,8 @@ function loop(now) {
       ghost.visible = Math.abs(ghost.position.y - G.camY) < viewHalfH + 4;
     }
   }
-  if (G && state === 'dying') updateDying(dt);
+  if (G && state === 'dying') { updateDying(dt); updateRevive(dt); }
+  updateBanner();
   if (G && state === 'play') updateHUD();
   if (G && state === 'result') { // 結果画面では仏像の周りをゆっくり回る
     const a = now * 0.0003;
@@ -1347,4 +1472,4 @@ function loop(now) {
 requestAnimationFrame(loop);
 
 // 動作確認用
-window.__buddha = { get state() { return state; }, get G() { return G; }, input, setModel, world, camera, scene, renderer, composer, step(n, dt = 1 / 60) { for (let i = 0; i < n && state === 'play'; i++) update(dt); }, restart() { show('result', false); startGame(); } };
+window.__buddha = { get state() { return state; }, get G() { return G; }, input, setModel, world, camera, scene, renderer, composer, step(n, dt = 1 / 60) { for (let i = 0; i < n && state === 'play'; i++) update(dt); }, restart() { show('result', false); startGame(); } }; // @web-only

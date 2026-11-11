@@ -1,3 +1,7 @@
+/* フォントは同梱（アプリでもオフラインで表示できるように。ゲームで使う文字だけに絞ってある。SIL Open Font License） */
+@font-face { font-family: "Dela Gothic One"; src: url("fonts/DelaGothicOne.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Zen Old Mincho"; src: url("fonts/ZenOldMincho-Bold.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+@font-face { font-family: "Zen Old Mincho"; src: url("fonts/ZenOldMincho-Black.woff2") format("woff2"); font-weight: 900; font-display: swap; }
 :root {
   --gold-grad: linear-gradient(180deg, #fffbe0 0%, #ffe07a 30%, #f0a91e 52%, #b8650a 56%, #ffd864 80%, #fff2b0 100%);
   --panel: linear-gradient(180deg, rgba(40, 18, 4, .82), rgba(20, 8, 2, .82));
@@ -217,3 +221,15 @@ body { display: flex; align-items: center; justify-content: center; }
 #templeScr { justify-content: flex-end; padding-bottom: max(14px, env(safe-area-inset-bottom)); background: linear-gradient(180deg, rgba(20,8,2,0) 30%, rgba(20,8,2,.5)); transition: opacity .35s; }
 #templeScr .card { max-height: 58cqh; gap: 8px; }
 #templeScr.cine { opacity: 0; pointer-events: none; }
+
+/* ---------- Android アプリ ---------- */
+/* タイトル下のバージョン・プライバシーポリシー・広告の設定 */
+.legal { font-size: 11px; color: #e8d2a8; text-shadow: 0 1px 2px #000; display: flex; gap: 8px; align-items: center; justify-content: center; flex-wrap: wrap; }
+.legal a { color: #ffe9a8; }
+.legal[hidden], #adPrivacy[hidden] { display: none; }
+/* 画面の下中央にバナー広告が出ている間は、ボタンが隠れないよう下を空ける */
+body.with-banner .screen { padding-bottom: calc(66px + env(safe-area-inset-bottom)); }
+/* 広告で復活 */
+#revive { z-index: 12; justify-content: flex-end; padding-bottom: 18cqh; }
+#revive .card { gap: 10px; padding: 16px; max-width: 360px; }
+.revive-note { margin: 0; text-align: center; color: #ffe9c0; font-size: clamp(14px, 4.2cqw, 17px); }

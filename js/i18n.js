@@ -43,6 +43,8 @@ const DICT = {
     forms: ['木造仏', '黒漆の仏像', '光背の仏像', '鎌倉の大仏', '黄金の大仏'],
     giant: '巨大大仏',
     ranks: ['煩悩まみれ', '修行僧', '天部', '明王', '菩薩', '如来'],
+    privacy: 'プライバシーポリシー', privacyUrl: 'https://techgym.jp/privacy-policy/', adSettings: '広告の設定',
+    reviveNote: '墜落した高さから、もう一度昇れます（1回だけ）', reviveWatch: '▶ 広告を見て復活する', reviveNext: 'つぎへ（{s}）', reviveLoading: '広告を読み込み中…', reviveFail: '広告を読み込めませんでした', revived: '復活 {n}回',
     noglTitle: 'WebGLが使えません', noglText: 'このゲームは3D表示（WebGL）に対応したブラウザで遊べます。',
   },
   en: {
@@ -86,6 +88,8 @@ const DICT = {
     forms: ['Wooden Buddha', 'Black Lacquer Buddha', 'Grand Halo Buddha', 'Great Buddha of Kamakura', 'Golden Great Buddha'],
     giant: 'Giant Great Buddha',
     ranks: ['Worldly Soul', 'Novice Monk', 'Deva', 'Wisdom King', 'Bodhisattva', 'Tathāgata'],
+    privacy: 'Privacy Policy', privacyUrl: 'https://techgym.jp/privacy-policy-en/', adSettings: 'Ad settings',
+    reviveNote: 'Climb again from where you fell (once per game)', reviveWatch: '▶ Watch an ad to revive', reviveNext: 'Skip ({s})', reviveLoading: 'Loading ad…', reviveFail: 'The ad could not be loaded', revived: 'Revived {n}×',
     noglTitle: 'WebGL is not available', noglText: 'This game needs a browser that supports 3D graphics (WebGL).',
   },
 };
@@ -119,6 +123,7 @@ export function applyStatic() {
   document.title = t('pageTitle');
   const desc = document.querySelector('meta[name="description"]'); if (desc) desc.content = t('pageDesc');
   document.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = t(el.dataset.i18n); });
+  const pl = document.getElementById('privacyLink'); if (pl) pl.href = t('privacyUrl');
   document.querySelectorAll('[data-i18n-html]').forEach((el) => { el.innerHTML = t(el.dataset.i18nHtml); });
   const rules = document.getElementById('rules');
   if (rules) rules.innerHTML = t('howRules').map((r) => `<li>${r}</li>`).join('');
