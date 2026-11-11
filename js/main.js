@@ -4,10 +4,10 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { buildBuddha, buildSkin, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611110052';
-import { World, UNIT_M, ALT_M, makeLightPillars } from './world.js?v=202611110052';
-import { t, lang, setLang, applyStatic } from './i18n.js?v=202611110052';
-import { AudioEngine } from './audio.js?v=202611110052';
+import { buildBuddha, buildSkin, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611110057';
+import { World, UNIT_M, ALT_M, makeLightPillars } from './world.js?v=202611110057';
+import { t, lang, setLang, applyStatic } from './i18n.js?v=202611110057';
+import { AudioEngine } from './audio.js?v=202611110057';
 
 const $ = (id) => document.getElementById(id);
 const store = {
@@ -457,7 +457,7 @@ function togglePause() {
 const NATIVE = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 const plugin = (name) => (NATIVE && window.Capacitor.Plugins ? window.Capacitor.Plugins[name] : null);
 const Ads = window.Ads || { available: false, canReward: false, showing: false, privacyOptionsRequired: false, initDone: Promise.resolve(), showInterstitial: async () => {}, showRewarded: async () => 'unavailable', setBanner() {}, showPrivacyOptions: async () => {} };
-const SITE_URL = 'https://techgymjp.github.io/buddha/';
+const SITE_URL = 'https://techgym.jp/column/claude-code-game-buddha/'; // シェアで紹介するページ
 // 広告の表示中は音を止める（ads.js から呼ばれる）
 window.AppSound = {
   suspend() { if (audio.ctx && audio.ctx.state === 'running') audio.ctx.suspend(); },
