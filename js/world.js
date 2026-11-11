@@ -1,6 +1,6 @@
 // 世界：空、光、雲、寺院、山頂の懸造り、雲海、天空、極楽浄土
 import * as THREE from 'three';
-import { canvasTex, glowTexture, dotTexture, buildBuddha, MAT, mergeStatic } from './models.js?v=202611110032';
+import { canvasTex, glowTexture, dotTexture, buildBuddha, MAT, mergeStatic } from './models.js?v=202611110052';
 
 export const UNIT_M = 6; // 景色：1ユニット = 6m
 export const ALT_M = 2;  // 高度計：仏像が1ユニット昇ると2m（景色は昇る速さの1/3で流れる）
@@ -18,6 +18,7 @@ const K = [
   { m: 9600, top: 0xf8c2dc, hor: 0xfff4d4, bot: 0xffffff, fog: 0xffefe0, near: 90, far: 1100, sun: 0xfff6e0, sunI: 3.2, sky: 0xfff0f4, gnd: 0xffe0b0, hemiI: 1.4, stars: 0, elev: 0.7 },
 ];
 const tmpA = new THREE.Color(), tmpB = new THREE.Color();
+const MOON_OFS = new THREE.Vector3(-380, 420, -900);
 function lerpC(a, b, t, out) { tmpA.setHex(a); tmpB.setHex(b); return out.copy(tmpA).lerp(tmpB, t); }
 
 export class World {
@@ -125,7 +126,7 @@ export class World {
     this.stars.material.opacity = st;
     this.stars.visible = st > 0.01;
     this.moon.material.opacity = st;
-    this.moon.position.copy(camPos).add(new THREE.Vector3(-380, 420, -900));
+    this.moon.position.copy(camPos).add(MOON_OFS);
     this.sky.position.copy(camPos); this.stars.position.copy(camPos);
 
     // 環境マップ（金属の映り込み）を時々作り直す
@@ -134,13 +135,21 @@ export class World {
   }
 
   // 環境マップ（金属の映り込み）を作り直す。重い処理なのでステージの切り替え時だけ行う
+  // 一度作った高さの映り込みは取っておき、同じステージでは作り直さない
   refreshEnv(altM) {
     this.envAlt = altM;
-    const old = this.env;
-    this.env = this.pmrem.fromScene(this.envScene, 0.02);
-    this.scene.environment = this.env.texture;
+    const key = Math.round(altM);
+    if (!this.envCache) this.envCache = new Map();
+    let e = this.envCache.get(key);
+    if (!e) { e = this.pmrem.fromScene(this.envScene, 0.02); this.envCache.set(key, e); }
+    this.env = e;
+    this.scene.environment = e.texture;
     this.scene.environmentIntensity = 0.75;
-    if (old) old.dispose();
+  }
+  // ゲーム開始前に、各ステージの映り込みを作っておく（プレイ中にステージが変わったときに止まらないように）
+  prepareEnvs(alts, camPos) {
+    for (const a of alts) { this.update(a, camPos, 0); this.refreshEnv(a); }
+    this.update(0, camPos, 0); this.refreshEnv(0);
   }
 
   // ---------- 寺院の境内 ----------

@@ -4,16 +4,17 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { buildBuddha, buildSkin, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611110032';
-import { World, UNIT_M, ALT_M, makeLightPillars } from './world.js?v=202611110032';
-import { t, lang, setLang, applyStatic } from './i18n.js?v=202611110032';
-import { AudioEngine } from './audio.js?v=202611110032';
+import { buildBuddha, buildSkin, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611110052';
+import { World, UNIT_M, ALT_M, makeLightPillars } from './world.js?v=202611110052';
+import { t, lang, setLang, applyStatic } from './i18n.js?v=202611110052';
+import { AudioEngine } from './audio.js?v=202611110052';
 
 const $ = (id) => document.getElementById(id);
 const store = {
   get(k, d) { try { const v = localStorage.getItem('flyingBuddha3d.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
   set(k, v) { try { localStorage.setItem('flyingBuddha3d.' + k, JSON.stringify(v)); } catch (e) { /* 保存できなくても遊べる */ } },
 };
+try { for (const k of ['ghost', 'ghost3']) localStorage.removeItem('flyingBuddha3d.' + k); } catch (e) { /* 使わなくなったゴーストの記録を消す */ }
 
 // ---------- 定数 ----------
 const STAGES = [
@@ -47,7 +48,8 @@ const VIEW_H = 17.5, VIEW_W = 12;
 // ---------- レンダラー ----------
 let renderer;
 try {
-  renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: true, powerPreference: 'high-performance' });
+  // スマホではアンチエイリアスを切る（画面効果を重ねているので見た目はほぼ変わらず、描画が軽くなる）
+  renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: !matchMedia('(pointer: coarse)').matches, powerPreference: 'high-performance' });
 } catch (e) {
   $('nogl').classList.remove('hidden'); $('title').classList.add('hidden');
   throw e;
@@ -86,7 +88,7 @@ function resize() {
   renderer.setSize(appW, appH, false);
   composer.setPixelRatio ? composer.setPixelRatio(renderer.getPixelRatio()) : null;
   composer.setSize(appW, appH);
-  bloom.resolution.set(appW / 2, appH / 2);
+  bloom.resolution.set(appW / (isMobile ? 3 : 2), appH / (isMobile ? 3 : 2)); // 光のにじみはスマホでは粗く計算する
   bloom.enabled = QUALITY[quality][1];
   camera.aspect = appW / appH; camera.updateProjectionMatrix();
 }
@@ -155,12 +157,13 @@ async function warmUp(onProgress = () => {}) {
     const tmp = new THREE.Group(); scene.add(tmp);
     for (let lv = 1; lv <= 5; lv++) { if (!modelCache[lv]) modelCache[lv] = buildBuddha(lv); onProgress(lv / 7); await idle(); } // 進化する仏像を全部作っておく
     if (skin !== 'buddha' && !modelCache[skin]) modelCache[skin] = buildSkin(skin);
-    const show = [...Object.values(modelCache).filter((m) => m !== model), ghost];
+    const show = [...Object.values(modelCache).filter((m) => m !== model)];
     for (let i = 0; i < 2; i++) crowPool.n.push(getCrow(false)); crowPool.g.push(getCrow(true));
     for (const tp of ['zeni', 'koban', 'goriyaku']) for (let i = 0; i < 4; i++) { const o = makeCoinMesh(tp); scene.add(o); o.visible = false; coinPool[tp].push(o); show.push(o); }
     for (let i = 0; i < 6; i++) { const m = new THREE.Mesh(RING_OUT, new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false })); scene.add(m); m.visible = false; shockPool.push(m); show.push(m); }
     for (const m of show) { if (!m.parent) tmp.add(m); m.visible = true; }
     for (const o of [...crowPool.n, ...crowPool.g]) o.visible = true;
+    world.prepareEnvs(STAGES.map((st) => st.start), camera.position); // 各ステージの映り込み
     onProgress(6 / 7); await idle();
     // 描画プログラムの準備（使えれば画面を止めない非同期の準備）
     if (renderer.compileAsync) await renderer.compileAsync(scene, camera); else renderer.compile(scene, camera);
@@ -168,7 +171,6 @@ async function warmUp(onProgress = () => {}) {
     for (const m of show) m.visible = false;
     for (const o of [...crowPool.n, ...crowPool.g]) o.visible = false;
     for (const m of Object.values(modelCache)) if (m.parent === tmp) tmp.remove(m);
-    ghost.visible = false; if (ghost.parent !== scene) scene.add(ghost);
   } catch (e) { /* 下準備に失敗しても遊べる */ }
 }
 
@@ -185,11 +187,6 @@ function setModel(lv) {
   buddhaRoot.add(model);
 }
 setModel(1);
-const ghostMat = new THREE.MeshBasicMaterial({ color: 0xbfe6ff, transparent: true, opacity: 0.28, depthWrite: false });
-const ghost = buildBuddha(1);
-ghost.traverse((o) => { if (o.isMesh || o.isInstancedMesh) o.material = ghostMat; if (o.isSprite) o.visible = false; });
-ghost.visible = false; scene.add(ghost);
-let ghostRun = null; // { alt, pts: [x0, y0, x1, y1, ...] } 0.1秒ごと
 const aura = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture, color: 0xffc860, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.4 }));
 aura.position.set(0, 1.2, -0.3); buddhaRoot.add(aura);
 // 吸い上げの渦（仏像の真下に伸びる黄金の竜巻）
@@ -220,7 +217,7 @@ for (let i = 0; i < 6; i++) {
 }
 
 // ---------- パーティクル ----------
-const MAXP = 1600;
+const MAXP = isMobile ? 900 : 1600; // 粒子の上限（スマホは少なめ）
 const pGeo = new THREE.BufferGeometry();
 const pPos = new Float32Array(MAXP * 3), pCol = new Float32Array(MAXP * 3);
 pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
@@ -491,7 +488,7 @@ let adBusy = false;
 async function withInterstitial(next) {
   if (adBusy) return;
   if (Ads.available) {
-    adBusy = true;
+    adBusy = true; updateBanner();
     show('pause', false); show('result', false); show('how', false);
     await adSafe(Ads.showInterstitial(3000));
     adBusy = false;
@@ -572,10 +569,14 @@ function doRevive() {
 }
 
 // バナー広告：トップ画面・遊び方・ポーズ・結果画面だけ（プレイ中は出さない）
+let bannerOn = null;
 function updateBanner() {
-  const on = (state === 'title' && $('templeScr').classList.contains('hidden')) || state === 'paused' || state === 'result';
-  Ads.setBanner(on && !adBusy);
-  document.body.classList.toggle('with-banner', Ads.available && on);
+  if (!Ads.available) return;
+  const on = ((state === 'title' && $('templeScr').classList.contains('hidden')) || state === 'paused' || state === 'result') && !adBusy;
+  if (on === bannerOn) return; // 変わったときだけ
+  bannerOn = on;
+  Ads.setBanner(on);
+  document.body.classList.toggle('with-banner', on);
 }
 
 // タイトル画面の下に、バージョン・プライバシーポリシー・広告の設定（EU など）を出す（アプリだけ）
@@ -603,9 +604,8 @@ function newGameState() {
 function startGame() {
   clearWorldObjects();
   G = newGameState();
-  G.rec = []; G.recT = 0; G.revives = 0;
+  G.revives = 0;
   G.perk = perks(); G.charms = G.perk.charms;
-  ghostRun = store.get('ghost3', null);
   setModel(1);
   resetMotes(G.camY);
   show('title', false); show('hud', true);
@@ -618,7 +618,7 @@ function beginStage(i) {
   setModel(FORMS[G.form].lv);
   state = 'play';
   $('stageName').textContent = stageLabel(i);
-  world.refreshEnv(altM());
+  world.refreshEnv(STAGES[i].start);
   banner(`第${i + 1}天`, STAGES[i].name);
   audio.gong();
 }
@@ -637,7 +637,7 @@ function enterStage(i) {
   G.stage = i;
   setModel(G.dai > 0 ? 5 : FORMS[G.form].lv);
   $('stageName').textContent = stageLabel(i);
-  world.refreshEnv(altM());
+  world.refreshEnv(STAGES[i].start);
   audio.gong(); flash(0.35);
   shockwave(G.bx, G.by + 1, 0xfff0c0, 12);
 }
@@ -857,8 +857,6 @@ function update(dt) {
   }
 
   // ゴースト用に0.1秒ごとの位置を記録
-  G.recT += dt;
-  while (G.recT >= 0.1) { G.recT -= 0.1; if (G.rec.length < 12000) G.rec.push(+G.bx.toFixed(2), +G.by.toFixed(2)); }
 
   // 物理：重力と、硬貨で得る逆重力（上向きの力）、空気抵抗
   let up = 0;
@@ -1190,7 +1188,6 @@ function gameOver(reason = '') {
   const prevBest = best.alt;
   saveBest();
   G.offer = Math.round(G.money * perks().offer); temple.wallet += G.offer; store.set('temple', temple); // 集めた賽銭はお寺の財布に貯まる
-  if (Math.floor(G.maxAlt || altM()) > prevBest && G.rec && G.rec.length > 20) store.set('ghost3', { alt: Math.floor(G.maxAlt || altM()), pts: G.rec });
   audio.over();
   const alt = Math.floor(G.maxAlt || altM());
   const isBest = alt > prevBest;
@@ -1219,6 +1216,8 @@ function saveBest() {
 
 // ---------- HUD ----------
 let hudCache = {};
+const opCache = {};
+function setOpacity(id, v) { if (opCache[id] !== v) { opCache[id] = v; $(id).style.opacity = v; } } // 変わったときだけ書き換える（毎フレームの再計算を減らす）
 function setText(id, v) { if (hudCache[id] !== v) { hudCache[id] = v; $(id).textContent = v; } }
 function updateHUD() {
   const st = STAGES[G.stage];
@@ -1300,7 +1299,7 @@ function frameVisuals(dt, t) {
     model.userData.mouth.scale.y = 0.04;
     world.update(0, camera.position, t);
     for (const L of lineData) L.k = 0; lineMat.opacity = 0;
-    swirl.visible = false; $('danger').style.opacity = 0;
+    swirl.visible = false; setOpacity('danger', '0');
     updatePillars(t, by + 10, 0);
     updateMotesFor(by);
     aura.material.opacity = 0.18;
@@ -1408,7 +1407,7 @@ function frameVisuals(dt, t) {
 
   // 沈みかけ：画面の縁が赤く脈打ち、心音が鳴る
   const dg = G.danger || 0;
-  $('danger').style.opacity = dg > 0 ? (dg * (0.55 + 0.45 * Math.sin(t * (0.008 + dg * 0.01)))).toFixed(3) : 0;
+  setOpacity('danger', dg > 0 ? (dg * (0.55 + 0.45 * Math.sin(t * (0.008 + dg * 0.01)))).toFixed(2) : '0');
   if (state === 'play' && dg > 0.25) { G.beatT -= dt; if (G.beatT <= 0) { audio.beat(dg); G.beatT = 0.85 - dg * 0.45; } }
   // 音楽の盛り上がりと風
   audio.intensity = Math.min(1, speed01 * 0.9 + (G.fever ? 0.25 : 0) + (G.dai > 0 ? 0.4 : 0));
@@ -1453,17 +1452,6 @@ function loop(now) {
   if (slowT > 0) { slowT -= dt; if (slowT <= 0) timeScale = 1; }
   const gdt = state === 'play' ? dt * timeScale : dt;
   if (G && state === 'play') { update(gdt); }
-  // ゴースト：最高記録のプレイの動きを半透明の仏像で再生
-  ghost.visible = false;
-  if (G && (state === 'play' || state === 'dying') && ghostRun && G.launch <= 0) {
-    const k = (G.time - G.launchedAt) / 0.1, i = Math.floor(k) * 2, P = ghostRun.pts;
-    if (i + 3 < P.length) {
-      const u = k - Math.floor(k);
-      ghost.position.set(P[i] + (P[i + 2] - P[i]) * u, P[i + 1] + (P[i + 3] - P[i + 1]) * u, -0.6);
-      ghost.scale.setScalar(1);
-      ghost.visible = Math.abs(ghost.position.y - G.camY) < viewHalfH + 4;
-    }
-  }
   if (G && state === 'dying') { updateDying(dt); updateRevive(dt); }
   updateBanner();
   if (G && state === 'play') updateHUD();
