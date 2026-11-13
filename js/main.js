@@ -4,10 +4,10 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { buildBuddha, buildSkin, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611110131';
-import { World, UNIT_M, ALT_M, makeLightPillars } from './world.js?v=202611110131';
-import { t, lang, setLang, applyStatic } from './i18n.js?v=202611110131';
-import { AudioEngine } from './audio.js?v=202611110131';
+import { buildBuddha, buildSkin, makeCoinMesh, makeCrow, glowTexture, dotTexture } from './models.js?v=202611130354';
+import { World, UNIT_M, ALT_M, makeLightPillars } from './world.js?v=202611130354';
+import { t, lang, setLang, applyStatic } from './i18n.js?v=202611130354';
+import { AudioEngine } from './audio.js?v=202611130354';
 
 const $ = (id) => document.getElementById(id);
 const store = {

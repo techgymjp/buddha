@@ -24,7 +24,7 @@ if (APP) {
     '.js': [/[ \t]*\/\/ web-only:start[\s\S]*?\/\/ web-only:end[ \t]*\n?/g, /^.*\/\/ @web-only.*\n?/gm],
   };
   // 取り除き忘れがあればビルドを止める
-  const banned = [/web-only/, /__buddha/, /__audio/];
+  const banned = [/web-only/, /__buddha/, /__audio/, /play\.google\.com/i, /Google Play/i, /storeLink/];
   const problems = [];
   const files = ['index.html', ...fs.readdirSync(path.join(out, 'js')).map((n) => path.join('js', n))];
   for (const name of files) {

@@ -28,6 +28,7 @@ const DICT = {
     storm: '<b>賽銭の嵐</b>で大仏に変身！',
     close: '閉じる',
     resAlt: '到達高度', resMoney: '獲得した賽銭',
+    storeGet: 'ANDROID アプリ版', storeName: 'Google Play で入手', // @web-only
     templeBtn: 'お寺', templeTitle: 'お寺', walletLbl: 'お寺の財布', donate: '寄進する', built: '建立済み', inOrder: '順に建立', skinTitle: '仏像を選ぶ',
     bName: ['山門', '灯籠の参道', '本堂', '鐘楼', '五重塔', '大仏殿'],
     bEff: ['吸引範囲アップ・達磨を解放', 'お守り＋1（カラスに1回耐える）', '300mからスタート・白衣観音を解放', '硬貨の浮力アップ', '800mからスタート・吸引範囲アップ・不動明王を解放', 'お寺に入る賽銭1.5倍'],
@@ -73,6 +74,7 @@ const DICT = {
     storm: 'A <b>coin storm</b> turns you into a giant Buddha!',
     close: 'Close',
     resAlt: 'Altitude reached', resMoney: 'Offerings collected',
+    storeGet: 'ANDROID APP', storeName: 'Get it on Google Play', // @web-only
     templeBtn: 'Temple', templeTitle: 'Your Temple', walletLbl: 'Temple funds', donate: 'Donate', built: 'Built', inOrder: 'Build in order', skinTitle: 'Choose your statue',
     bName: ['Sanmon Gate', 'Lantern Path', 'Main Hall', 'Bell Tower', 'Five-story Pagoda', 'Great Buddha Hall'],
     bEff: ['Wider suction · unlocks Daruma', '+1 charm (survive one crow hit)', 'Start at 300m · unlocks White-robed Kannon', 'Stronger coin lift', 'Start at 800m · wider suction · unlocks Fudō Myōō', 'Offerings to the temple ×1.5'],
