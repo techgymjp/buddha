@@ -38,4 +38,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- 大事な場面で端末を震わせる（navigator.vibrate） -->
     <uses-permission android:name="android.permission.VIBRATE" />
+
+    <!-- 画面は縦向きに固定しているが、縦画面の機能は必須ではない（縦向きにできない端末でもインストールできるように） -->
+    <uses-feature android:name="android.hardware.screen.portrait" android:required="false" />
 </manifest>
