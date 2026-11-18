@@ -14,7 +14,7 @@ window.Ads = (() => {
       // 本番の広告ユニット(AdMob の Android アプリ「空飛ぶ仏像」)
       production: {
         interstitial: 'ca-app-pub-6411535997477460/4980573245',
-        rewarded: 'ca-app-pub-6411535997477460/2849629735',
+        rewarded: 'ca-app-pub-6411535997477460/4541589547',
         banner: 'ca-app-pub-6411535997477460/1232899927',
       },
     },
